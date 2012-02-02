@@ -84,6 +84,24 @@ begin
   Result := True;
 end;
 
+procedure CleanseBitmap(bmp: TMufasaBitmap; w, h: Integer);
+
+var
+   x, y, ow, oh: Integer;
+begin
+  ow := bmp.width; oh := bmp.height;
+  if (ow < w) or (oh < h) then
+  begin
+    bmp.SetSize(w, h);
+    for x := ow to w - 1 do
+      for y := oh to h - 1  do
+      begin
+        bmp.FastSetPixel(x, y, 0);
+      end;
+  end;
+
+end;
+
 procedure TForm1.OCRButtonClick(Sender: TObject);
 Var
    C: TClient;
@@ -125,6 +143,7 @@ begin
   else
   begin
     bmp.LoadFromFile(BitmapPath);
+      CleanseBitmap(bmp, 401 + XXX, 21 + YYY);
     C.IOManager.SetTarget(bmp);
   end;
 
