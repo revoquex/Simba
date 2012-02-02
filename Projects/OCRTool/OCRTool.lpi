@@ -34,12 +34,12 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="7">
+    <Units Count="8">
       <Unit0>
         <Filename Value="OCRTool.lpr"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OCRTool"/>
-        <UsageCount Value="23"/>
+        <UsageCount Value="26"/>
       </Unit0>
       <Unit1>
         <Filename Value="ocrtoolunit.pas"/>
@@ -47,12 +47,11 @@
         <ComponentName Value="Form1"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="ocrtoolunit"/>
-        <IsVisibleTab Value="True"/>
         <EditorIndex Value="0"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="85"/>
-        <CursorPos X="51" Y="100"/>
-        <UsageCount Value="23"/>
+        <TopLine Value="1"/>
+        <CursorPos X="79" Y="27"/>
+        <UsageCount Value="26"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
@@ -94,135 +93,132 @@
       <Unit6>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
         <UnitName Value="ocr"/>
+        <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="917"/>
-        <CursorPos X="1" Y="938"/>
-        <UsageCount Value="11"/>
+        <TopLine Value="516"/>
+        <CursorPos X="116" Y="546"/>
+        <UsageCount Value="13"/>
         <Loaded Value="True"/>
       </Unit6>
+      <Unit7>
+        <Filename Value="../../Units/MMLCore/tpa.pas"/>
+        <UnitName Value="tpa"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="1114"/>
+        <CursorPos X="22" Y="1053"/>
+        <UsageCount Value="10"/>
+      </Unit7>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
+    <JumpHistory Count="27" HistoryIndex="26">
       <Position1>
         <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="66" Column="49" TopLine="47"/>
+        <Caret Line="99" Column="39" TopLine="90"/>
       </Position1>
       <Position2>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="69" Column="91" TopLine="48"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="632" Column="40" TopLine="598"/>
       </Position2>
       <Position3>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="45" Column="5" TopLine="13"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="67" Column="35" TopLine="44"/>
       </Position3>
       <Position4>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="71" Column="90" TopLine="51"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="270" Column="21" TopLine="234"/>
       </Position4>
       <Position5>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="65" Column="34" TopLine="41"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="399" Column="37" TopLine="374"/>
       </Position5>
       <Position6>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="24" Column="63" TopLine="17"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="1" Column="1" TopLine="1"/>
       </Position6>
       <Position7>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="146" Column="34" TopLine="47"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="270" Column="57" TopLine="242"/>
       </Position7>
       <Position8>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="61" Column="22" TopLine="47"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="56" Column="29" TopLine="49"/>
       </Position8>
       <Position9>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="101" Column="6" TopLine="81"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="97" Column="61" TopLine="71"/>
       </Position9>
       <Position10>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="158" Column="1" TopLine="148"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="59" Column="48" TopLine="23"/>
       </Position10>
       <Position11>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="5" Column="3" TopLine="1"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="66" Column="88" TopLine="59"/>
       </Position11>
       <Position12>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="116" Column="44" TopLine="97"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="72" Column="23" TopLine="59"/>
       </Position12>
       <Position13>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="110" Column="37" TopLine="98"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="80" Column="21" TopLine="59"/>
       </Position13>
       <Position14>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="111" Column="37" TopLine="99"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="167" Column="20" TopLine="132"/>
       </Position14>
       <Position15>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="122" Column="49" TopLine="101"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="66" Column="43" TopLine="181"/>
       </Position15>
       <Position16>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="140" Column="37" TopLine="110"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="167" Column="23" TopLine="146"/>
       </Position16>
       <Position17>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="65" Column="1" TopLine="46"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="313" Column="13" TopLine="282"/>
       </Position17>
       <Position18>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="51" Column="33" TopLine="46"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="524" Column="15" TopLine="498"/>
       </Position18>
       <Position19>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="165" Column="43" TopLine="138"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="526" Column="54" TopLine="505"/>
       </Position19>
       <Position20>
-        <Filename Value="ocrtoolunit.pas"/>
-        <Caret Line="26" Column="35" TopLine="13"/>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <Caret Line="529" Column="53" TopLine="496"/>
       </Position20>
       <Position21>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="295" Column="87" TopLine="277"/>
+        <Caret Line="526" Column="53" TopLine="508"/>
       </Position21>
       <Position22>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="737" Column="27" TopLine="702"/>
+        <Caret Line="543" Column="29" TopLine="517"/>
       </Position22>
       <Position23>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="1" Column="1" TopLine="1"/>
+        <Caret Line="699" Column="12" TopLine="687"/>
       </Position23>
       <Position24>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="68" Column="39" TopLine="33"/>
+        <Caret Line="83" Column="42" TopLine="62"/>
       </Position24>
       <Position25>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="81" Column="56" TopLine="55"/>
+        <Caret Line="536" Column="20" TopLine="509"/>
       </Position25>
       <Position26>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="85" Column="16" TopLine="55"/>
+        <Caret Line="547" Column="7" TopLine="521"/>
       </Position26>
       <Position27>
         <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="572" Column="24" TopLine="537"/>
+        <Caret Line="537" Column="17" TopLine="516"/>
       </Position27>
-      <Position28>
-        <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="579" Column="14" TopLine="544"/>
-      </Position28>
-      <Position29>
-        <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="705" Column="38" TopLine="692"/>
-      </Position29>
-      <Position30>
-        <Filename Value="../../Units/MMLCore/ocr.pas"/>
-        <Caret Line="911" Column="14" TopLine="876"/>
-      </Position30>
     </JumpHistory>
   </ProjectOptions>
   <CompilerOptions>
@@ -246,7 +242,7 @@
       <CompilerMessages>
         <UseMsgFile Value="True"/>
       </CompilerMessages>
-      <CustomOptions Value="-dOCRDEBUG"/>
+      <CustomOptions Value="-dDOOCRDEBUG"/>
       <CompilerPath Value="$(CompPath)"/>
     </Other>
   </CompilerOptions>

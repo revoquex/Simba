@@ -96,7 +96,7 @@ begin
     for x := ow to w - 1 do
       for y := oh to h - 1  do
       begin
-        bmp.FastSetPixel(x, y, 0);
+        bmp.FastSetPixel(x, y, clWhite);
       end;
   end;
 
