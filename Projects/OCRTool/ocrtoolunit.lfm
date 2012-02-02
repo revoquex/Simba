@@ -6,6 +6,7 @@ object Form1: TForm1
   Caption = 'Form1'
   ClientHeight = 471
   ClientWidth = 677
+  OnCreate = FormCreate
   LCLVersion = '0.9.30.1'
   object Image1: TImage
     Left = 16
@@ -55,8 +56,39 @@ object Form1: TForm1
     Top = 416
     Width = 144
     Caption = 'Edit Filters'
-    OnClick = EditFiltersButtonClick
     TabOrder = 4
+  end
+  object ShadowCheckbox: TCheckBox
+    Left = 16
+    Height = 22
+    Top = 368
+    Width = 132
+    Caption = 'OCR with shadow'
+    TabOrder = 5
+  end
+  object Label1: TLabel
+    Left = 16
+    Height = 16
+    Top = 400
+    Width = 71
+    Caption = 'Search at: '
+    ParentColor = False
+  end
+  object XEdit: TEdit
+    Left = 96
+    Height = 25
+    Top = 400
+    Width = 48
+    TabOrder = 6
+    Text = '4'
+  end
+  object YEdit: TEdit
+    Left = 152
+    Height = 25
+    Top = 400
+    Width = 48
+    TabOrder = 7
+    Text = '4'
   end
   object OCRFileOpen: TOpenDialog
     left = 268

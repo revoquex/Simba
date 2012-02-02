@@ -34,7 +34,7 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="5">
+    <Units Count="7">
       <Unit0>
         <Filename Value="OCRTool.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -50,21 +50,22 @@
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="0"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="1"/>
-        <CursorPos X="26" Y="12"/>
+        <TopLine Value="126"/>
+        <CursorPos X="25" Y="148"/>
         <UsageCount Value="21"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="../OCRBench/unit1.pas"/>
+        <ComponentName Value="Form1"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
         <UnitName Value="Unit1"/>
-        <EditorIndex Value="1"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="66"/>
-        <CursorPos X="68" Y="91"/>
+        <TopLine Value="101"/>
+        <CursorPos X="40" Y="128"/>
         <UsageCount Value="10"/>
-        <Loaded Value="True"/>
       </Unit2>
       <Unit3>
         <Filename Value="../../Units/MMLCore/bitmaps.pas"/>
@@ -82,8 +83,24 @@
         <CursorPos X="56" Y="27"/>
         <UsageCount Value="10"/>
       </Unit4>
+      <Unit5>
+        <Filename Value="../OCRBench/project1.lpr"/>
+        <UnitName Value="project1"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="1"/>
+        <CursorPos X="41" Y="14"/>
+        <UsageCount Value="10"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="../../Units/MMLCore/ocr.pas"/>
+        <UnitName Value="ocr"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="215"/>
+        <CursorPos X="36" Y="96"/>
+        <UsageCount Value="10"/>
+      </Unit6>
     </Units>
-    <JumpHistory Count="7" HistoryIndex="6">
+    <JumpHistory Count="20" HistoryIndex="19">
       <Position1>
         <Filename Value="ocrtoolunit.pas"/>
         <Caret Line="73" Column="7" TopLine="32"/>
@@ -112,6 +129,58 @@
         <Filename Value="ocrtoolunit.pas"/>
         <Caret Line="24" Column="63" TopLine="17"/>
       </Position7>
+      <Position8>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="146" Column="34" TopLine="47"/>
+      </Position8>
+      <Position9>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="61" Column="22" TopLine="47"/>
+      </Position9>
+      <Position10>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="101" Column="6" TopLine="81"/>
+      </Position10>
+      <Position11>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="158" Column="1" TopLine="148"/>
+      </Position11>
+      <Position12>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="5" Column="3" TopLine="1"/>
+      </Position12>
+      <Position13>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="116" Column="44" TopLine="97"/>
+      </Position13>
+      <Position14>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="110" Column="37" TopLine="98"/>
+      </Position14>
+      <Position15>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="111" Column="37" TopLine="99"/>
+      </Position15>
+      <Position16>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="122" Column="49" TopLine="101"/>
+      </Position16>
+      <Position17>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="140" Column="37" TopLine="110"/>
+      </Position17>
+      <Position18>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="65" Column="1" TopLine="46"/>
+      </Position18>
+      <Position19>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="51" Column="33" TopLine="46"/>
+      </Position19>
+      <Position20>
+        <Filename Value="ocrtoolunit.pas"/>
+        <Caret Line="165" Column="43" TopLine="138"/>
+      </Position20>
     </JumpHistory>
   </ProjectOptions>
   <CompilerOptions>
@@ -135,6 +204,7 @@
       <CompilerMessages>
         <UseMsgFile Value="True"/>
       </CompilerMessages>
+      <CustomOptions Value="-dOCRDEBUG"/>
       <CompilerPath Value="$(CompPath)"/>
     </Other>
   </CompilerOptions>

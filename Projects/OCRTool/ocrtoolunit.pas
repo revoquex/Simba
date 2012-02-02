@@ -2,6 +2,8 @@ unit ocrtoolunit;
 
 {$mode objfpc}{$H+}
 
+//{$DEFINE OCRDEBUG}
+
 
 {
   Features:
@@ -28,6 +30,10 @@ type
   { TForm1 }
 
   TForm1 = class(TForm)
+    XEdit: TEdit;
+    YEdit: TEdit;
+    Label1: TLabel;
+    ShadowCheckbox: TCheckBox;
     OCRButton: TButton;
     UpCharsDialog: TSelectDirectoryDialog;
     SetFontButton: TButton;
@@ -36,15 +42,17 @@ type
     SetClientButton: TButton;
     EditFiltersButton: TButton;
     Image1: TImage;
+    procedure FormCreate(Sender: TObject);
     procedure OCRButtonClick(Sender: TObject);
     procedure SetFontButtonClick(Sender: TObject);
     procedure SetBitmapButtonClick(Sender: TObject);
     procedure SetClientButtonClick(Sender: TObject);
-    procedure EditFiltersButtonClick(Sender: TObject);
+    function RunChecks: Boolean;
   private
     { private declarations }
     BitmapPath: String;
     FontPath: String;
+    XXX, YYY: Integer;
 
     //CliW: TIOManager;
     UseClient: Boolean;
@@ -54,17 +62,122 @@ type
   end; 
 
 var
-  Form1: TForm1; 
+  Form1: TForm1;
 
 implementation
+uses
+    lclintf, lcltype;
 
 {$R *.lfm}
 
 { TForm1 }
 
-procedure TForm1.OCRButtonClick(Sender: TObject);
-begin
+function TForm1.RunChecks: boolean;
 
+begin
+  XXX := StrToIntDef(XEdit.Text, -1);
+  if XXX = -1 then
+    Exit(False);
+  YYY := StrToIntDef(YEdit.Text, -1);
+  if YYY = -1 then
+    Exit(False);
+  Result := True;
+end;
+
+procedure TForm1.OCRButtonClick(Sender: TObject);
+Var
+   C: TClient;
+   bmp: TMufasaBitmap;
+   x,y, ii: integer;
+   s: string;
+   Shadow: boolean;
+   t: dword;
+
+begin
+  if not RunChecks then
+    exit;
+
+  if not FileExists(BitmapPath) and not UseClient then
+  begin
+    MessageBox(0,pchar('You did not set a valid bitmap'), Pchar('Bitmap Error'),
+                    MB_OK);
+    if OCRFileOpen.Execute then
+      BitmapPath := OCRFileOpen.FileName;
+    Exit;
+  end;
+  if not DirectoryExists(FontPath) then
+  begin
+    MessageBox(0,pchar('You did not set a FontPath' ), Pchar('Path Error'),
+                    MB_OK);
+    if UpCharsDialog.Execute then
+      FontPath := UpCharsDialog.FileName;
+    Exit;
+  end;
+
+  Form1.Image1.Canvas.Brush.Color := 0;
+  Form1.Image1.Canvas.Rectangle(0, 0, Form1.Image1.Canvas.Width,  Form1.Image1.Canvas.Height);
+
+  // create and init client
+  C := TClient.Create('');
+  bmp := TMufasaBitmap.Create;
+  if UseClient then
+   //C.IOManager.SetTarget(TWindow(CliW.GetImageTarget).GetNativeWindow())
+  else
+  begin
+    bmp.LoadFromFile(BitmapPath);
+    C.IOManager.SetTarget(bmp);
+  end;
+
+  Shadow := ShadowCheckbox.Checked;
+
+  // DS + .. + DS because InitOCR wants the directory of the Fonts, not UpChars
+  // only.
+  C.MOCR.InitTOCR(FontPath + DS);
+  //C.MOCR.SetFonts(C.MOCR.GetFonts);
+
+
+  t:=gettickcount;
+
+  s := C.MOCR.GetUpTextAtEx(XXX, YYY, Shadow);
+
+  writeln(inttostr(gettickcount-t));
+
+ { for  ii := 1 to length(s) do
+    writeln('Text found: ' + s[ii]);     }
+
+  writeln('Text: ' + s);
+
+
+  // write to debugbmp
+  {$IFDEF OCRDEBUG}
+  for y := 0 to C.MOCR.debugbmp.Height - 1 do
+    for x := 0 to C.MOCR.debugbmp.Width -1 do
+      Form1.Image1.Canvas.Pixels[x,y] := C.MOCR.debugbmp.FastGetPixel(x,y);
+  // print ocr'ed text
+
+  Form1.Image1.Canvas.Font.Color:=clRed;
+  Form1.Image1.Canvas.TextOut(0, C.MOCR.debugbmp.Height, s);
+
+  C.MOCR.debugbmp.Free;
+  {$ELSE}
+  Form1.Image1.Canvas.Font.Color:=clRed;
+  Form1.Image1.Canvas.TextOut(0, 0, s);
+  {$ENDIF}
+  {$IFDEF OCRDEBUG}
+  Form1.Image1.Picture.SaveToFile(OCRDebugPath + 'ocrbench.bmp');
+  {$ENDIF}
+
+  bmp.OnDestroy:=nil;
+  bmp.Free;
+  C.Free;
+  Application.ProcessMessages;
+
+end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  BitmapPath := '/home/merlijn/Programs/simba/uptext11.png';
+  FontPath := '/home/merlijn/Programs/simba/Fonts/';
 end;
 
 procedure TForm1.SetFontButtonClick(Sender: TObject);
@@ -83,11 +196,6 @@ begin
 end;
 
 procedure TForm1.SetClientButtonClick(Sender: TObject);
-begin
-
-end;
-
-procedure TForm1.EditFiltersButtonClick(Sender: TObject);
 begin
 
 end;
