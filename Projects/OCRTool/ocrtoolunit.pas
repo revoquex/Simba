@@ -23,7 +23,9 @@ uses
   StdCtrls,
 
   // Custom
-  Client, MufasaTypes, Bitmaps, ocr, windowselector, iomanager;
+  Client, MufasaTypes, mufasabase, Bitmaps, ocr, windowselector, iomanager
+  {$IFDEF MSWINDOWS} ,os_windows {$ENDIF}
+  {$IFDEF LINUX} ,os_linux {$ENDIF}     ;
 
 type
 
@@ -44,9 +46,10 @@ type
     Image1: TImage;
     procedure FormCreate(Sender: TObject);
     procedure OCRButtonClick(Sender: TObject);
+    procedure SetClientButtonMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure SetFontButtonClick(Sender: TObject);
     procedure SetBitmapButtonClick(Sender: TObject);
-    procedure SetClientButtonClick(Sender: TObject);
     function RunChecks: Boolean;
   private
     { private declarations }
@@ -54,7 +57,7 @@ type
     FontPath: String;
     XXX, YYY: Integer;
 
-    //CliW: TIOManager;
+    CliW: TIOManager;
     UseClient: Boolean;
 
   public
@@ -66,7 +69,7 @@ var
 
 implementation
 uses
-    lclintf, lcltype;
+    lclintf, lcltype    ;
 
 {$R *.lfm}
 
@@ -139,7 +142,7 @@ begin
   C := TClient.Create('');
   bmp := TMufasaBitmap.Create;
   if UseClient then
-   //C.IOManager.SetTarget(TWindow(CliW.GetImageTarget).GetNativeWindow())
+    C.IOManager.SetTarget(TWindow(CliW.GetImageTarget).GetNativeWindow())
   else
   begin
     bmp.LoadFromFile(BitmapPath);
@@ -193,6 +196,18 @@ begin
 
 end;
 
+procedure TForm1.SetClientButtonMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+Var
+   WS: TMWindowSelector;
+begin
+  UseClient := True;
+  if not assigned(CliW) then
+    CliW := TIOManager.Create;
+  WS := TMWindowSelector.Create(CliW);
+  CliW.SetTarget(WS.Drag);
+end;
+
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   BitmapPath := '/home/merlijn/Programs/simba/uptext11.png';
@@ -214,10 +229,6 @@ begin
   end;
 end;
 
-procedure TForm1.SetClientButtonClick(Sender: TObject);
-begin
-
-end;
 
 end.
 

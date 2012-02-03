@@ -47,7 +47,7 @@ object Form1: TForm1
     Top = 368
     Width = 144
     Caption = 'Select Client'
-    OnClick = SetClientButtonClick
+    OnMouseDown = SetClientButtonMouseDown
     TabOrder = 3
   end
   object EditFiltersButton: TButton
