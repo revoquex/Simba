@@ -47,23 +47,6 @@ all the ``Filter*`` functions.
 *)
 
 type
-
-  TOCRFilterData = record
-      _type: integer;
-      is_text_color: boolean;
-
-      r_low,r_high,g_low,g_high,b_low,b_high,set_col: integer;
-
-      ref_color,tol,cts: integer;
-  end;
-
-  POCRFilterData = ^TOCRFilterData;
-
-  TOcrFilterDataArray = array of TOCRFilterData;
-  POcrFilterDataArray = ^TOCRFilterDataArray;
-
-
-
     { TMOCR }
 
   TMOCR = class(TObject)
