@@ -305,7 +305,7 @@ AddGlobalFunc('procedure ocr_FilterUpTextByCharacteristics(bmp: Integer);', @Lap
 AddGlobalFunc('procedure Lape_SetUpTextFilter(filterdata: TOcrFilterDataArray);',
     @Lape_SetUpTextFilter);
 AddGlobalFunc('procedure Lape_ResetUpTextFilter(const: Params: PParamArray);',
-    @Lape_ResetTextFilter);
+    @Lape_ResetUpTextFilter);
 
 { Other }
 
