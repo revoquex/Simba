@@ -68,12 +68,12 @@ begin
   ps_FilterUpTextByCharacteristics(ps_GetMufasaBitmap(PInteger(Params^[0])^));
 end;
 
-procedure Lape_SetUpTextFilter(const: Params: PParamArray);
+procedure Lape_SetUpTextFilter(const Params: PParamArray);
 begin
   ps_SetUpTextFilter(POcrFilterDataArray(Params^[0])^);
 end;
 
-procedure Lape_ResetUpTextFilter(const: Params: PParamArray);
+procedure Lape_ResetUpTextFilter(const Params: PParamArray);
 begin
   ps_ResetUpTextFilter;
 end;
