@@ -1,3 +1,5 @@
+XXX: This will not work when the window resizes, so it''s probably useless.
+
 {
 	This file is part of the Mufasa Macro Library (MML)
 	Copyright (c) 2009-2012 by Raymond van Venetië and Merlijn Wajer
@@ -85,6 +87,9 @@ interface
 
         { Reference to the XImage }
         buffer: PXImage;
+
+        { Image Data Pointer }
+        buf_ptr: PByte;
 
         { For memory-leak checks }
         dirty: Boolean;  //true if image loaded
@@ -214,6 +219,8 @@ implementation
 
   { See if the semaphores / CS are initialised }
   constructor TWindow.Create(display: PDisplay; screennum: integer; window: x.TWindow);
+  var
+      vis: PVisual;
   begin
     inherited Create;
     self.display:= display;
@@ -233,6 +240,18 @@ implementation
     finally
       ErrorCS.Leave;
     end;
+
+    vis := XDefaultVisual(display, screennum);
+    writeln('Bits per rgb: ', vis^.bits_per_rgb);
+    writeln('Red mask: ', vis^.red_mask);
+    writeln('Green mask: ', vis^.green_mask);
+    writeln('Blue mask: ', vis^.blue_mask);
+
+    // Depth = 24 ?
+    // Bitmap_Pad = 32
+    // TODO: visual
+    buf_ptr := AllocMem(SizeOf(Byte) * 4 * ww * hh);
+    buffer := XCreateImage(display, vis, 32, ZPixmap, 0, bufptr, ww, hh, 32, ww * 4);
   end;
 
   destructor TWindow.Destroy;
@@ -323,7 +342,16 @@ implementation
                                 ' the previously used data. Do not forget to'+
                                 ' call FreeReturnData', []);
 
+    {
+    XGetSubImage(display, window, xs, ys, width, height, AllPlaces, ZPixmap,
+        buffer, 0, 0);
+    }
+
     buffer := XGetImage(display, window, xs, ys, width, height, AllPlanes, ZPixmap);
+    writeln('Depth: ', buffer^.depth);
+    writeln('bytes_per_line ', buffer^.bytes_per_line);
+    writeln('bits per pixel ', buffer^.bits_per_pixel);
+    writeln('bitmap_pad ', buffer^.bitmap_pad);
     if buffer = nil then
     begin
       mDebugLn('ReturnData: XGetImage Error. Dumping data now:');
@@ -343,6 +371,7 @@ implementation
 
   procedure TWindow.FreeReturnData;
   begin
+    { TODO: Only free on destruction of class }
     if dirty then
     begin
       if (buffer <> nil) then
