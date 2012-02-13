@@ -32,8 +32,8 @@ unit os_linux;
 interface
 
   uses
-    Classes, SysUtils, mufasatypes, xlib, x, xutil, IOManager, XKeyInput, ctypes, xtest,
-    syncobjs, mufasabase;
+    Classes, SysUtils, ipc, mufasatypes, xlib, x, xutil, IOManager, XKeyInput, ctypes, xtest,
+    syncobjs, mufasabase, xshm;
 
   type
 
@@ -76,7 +76,7 @@ interface
 
         function GetNativeWindow: TNativeWindow;
       private
-        procedure UpdateImage;
+        procedure UpdateImage(First: Boolean);
         procedure FreeImage;
       private
         { display is the connection to the X server }
@@ -89,8 +89,7 @@ interface
         { Reference to the XImage }
         buffer: PXImage;
 
-        { Image Data Pointer }
-        buf_ptr: PChar;
+        shminfo: TXShmSegmentInfo;
 
         { Stored Width / Height }
         sw, sh: Integer;
@@ -239,7 +238,7 @@ implementation
       ErrorCS.Leave;
     end;
 
-    UpdateImage;
+    UpdateImage(True);
   end;
 
   destructor TWindow.Destroy;
@@ -264,28 +263,38 @@ implementation
     inherited Destroy;
   end;
 
-  procedure TWindow.UpdateImage;
+  procedure TWindow.UpdateImage(First: Boolean);
   var
       vis: PVisual;
   begin
-    FreeImage;
+    writeln('UpdateImage: ', First);
+    if not First then
+      FreeImage;
 
     vis := XDefaultVisual(display, screennum);
-    //writeln('Bits per rgb: ', vis^.bits_per_rgb);
-    //writeln('Red mask: ', vis^.red_mask);
-    //writeln('Green mask: ', vis^.green_mask);
-    //writeln('Blue mask: ', vis^.blue_mask);
 
-    // Depth = 24 ?
-    // Bitmap_Pad = 32
     GetTargetDimensions(sw, sh);
-    buf_ptr := AllocMem(SizeOf(Byte) * 4 * sw * sh);
-    buffer := XCreateImage(display, vis, 32, ZPixmap, 0, buf_ptr, sw, sh, 32, sw * 4);
+    writeln('sw, sh: ', sw, ' ', sh);
+
+    //buffer := XCreateImage(display, vis, 32, ZPixmap, 0, buf_ptr, sw, sh, 32, sw * 4);
+    buffer := XShmCreateImage(display, vis, 32, ZPixmap, nil, @shminfo, sw, sh);
+    writeln('buffer w, h: ' , buffer^.width, ' ', buffer^.height);
+
+    shminfo.shmid:= shmget(IPC_PRIVATE, buffer^.bytes_per_line * buffer^.height, IPC_CREAT or 0777);
+    shminfo.shmaddr := shmat(shminfo.shmid, nil, 0);
+    buffer^.data := shminfo.shmaddr;
+    shminfo.readOnly := 1;
+    XShmAttach(display, @shminfo);
   end;
 
   procedure TWindow.FreeImage;
   begin
-    if Assigned(buffer) then
+    writeln('Free Image');
+    XShmDetach(display, @shminfo);
+    XDestroyImage(buffer);
+    shmdt(shminfo.shmaddr);
+    // TODO
+    {if Assigned(buffer) then
     begin
       buffer^.data := nil;
       XDestroyImage(buffer);
@@ -296,6 +305,7 @@ implementation
       FreeMem(buf_ptr);
     { buf_ptr is freed by XDestroyImage }
     buf_ptr := nil;
+    }
   end;
 
   function TWindow.GetNativeWindow: TNativeWindow;
@@ -355,29 +365,26 @@ implementation
   function TWindow.ReturnData(xs, ys, width, height: Integer): TRetData;
   var
     w,h: integer;
-    ret: Pointer;
+    ret: integer;
   begin
     GetTargetDimensions(w, h);
 
     if(w <> sw) or (h <> sh) then
     begin
-      //writeln('ReturnData - Updating Image');
-      UpdateImage;
+      writeln('ReturnData - Updating Image');
+      UpdateImage(False);
     end;
 
     if (xs < 0) or (xs + width > w) or (ys < 0) or (ys + height > h) then
       raise Exception.CreateFMT('TMWindow.ReturnData: The parameters passed are wrong; xs,ys %d,%d width,height %d,%d',[xs,ys,width,height]);
 
-    ret := XGetSubImage(display, window, xs, ys, width, height, AllPlanes, ZPixmap, buffer, 0, 0);
+//    ret := XGetSubImage(display, window, xs, ys, width, height, AllPlanes, ZPixmap, buffer, 0, 0);
+    ret := XShmGetImage(display, window, buffer, 0, 0, AllPlanes);
+    // XShmGetImage
 
-    //writeln('Depth: ', buffer^.depth);
-    //writeln('bytes_per_line ', buffer^.bytes_per_line);
-    //writeln('bits per pixel ', buffer^.bits_per_pixel);
-    //writeln('bitmap_pad ', buffer^.bitmap_pad);
-
-    if ret = nil then
+    if ret = 0 then
     begin
-      mDebugLn('ReturnData: XGetSubImage Error. Dumping data now:');
+      mDebugLn('ReturnData: XShmGetImage Error. Dumping data now:');
       mDebugLn('xs, ys, width, height: ' + inttostr(xs) + ', '  + inttostr(ys) +
               ', ' + inttostr(width) + ', ' + inttostr(height));
       Result.Ptr := nil;
@@ -388,7 +395,6 @@ implementation
 
     Result.Ptr := PRGB32(buffer^.data);
     Result.IncPtrWith := (buffer^.bytes_per_line shr 2) * (sw - width);
-    //writeln('Result.IncPtrWith: ', Result.IncPtrWith);
     Result.RowLen := sw;
     //XSetErrorHandler(Old_Handler);
   end;
