@@ -375,7 +375,7 @@ implementation
     //writeln('bits per pixel ', buffer^.bits_per_pixel);
     //writeln('bitmap_pad ', buffer^.bitmap_pad);
 
-    if buffer = nil then
+    if ret = nil then
     begin
       mDebugLn('ReturnData: XGetSubImage Error. Dumping data now:');
       mDebugLn('xs, ys, width, height: ' + inttostr(xs) + ', '  + inttostr(ys) +
