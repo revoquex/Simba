@@ -33,7 +33,7 @@ interface
 
   uses
     Classes, SysUtils, ipc, mufasatypes, xlib, x, xutil, IOManager, XKeyInput, ctypes, xtest,
-    syncobjs, mufasabase, xshm;
+    syncobjs, mufasabase, xshm, baseunix;
 
   type
 
@@ -84,6 +84,8 @@ interface
 
         { screen-number and selected window }
         screennum: integer;
+        screen: PScreen;
+
         window: x.TWindow;
 
         { Reference to the XImage }
@@ -156,6 +158,7 @@ implementation
   function MufasaXErrorHandler(para1:PDisplay; para2:PXErrorEvent):cint; cdecl;
 
   begin
+    raise Exception.Create('');
     case para2^.error_code of
       1:  xerror := 'BadRequest';
       2:  xerror := 'BadValue';
@@ -223,6 +226,8 @@ implementation
     inherited Create;
     self.display:= display;
     self.screennum:= screennum;
+    self.screen :=  XDefaultScreenOfDisplay(display);
+
     self.window:= window;
     self.keyinput:= TKeyInput.Create;
 
@@ -233,10 +238,12 @@ implementation
       ErrorCS := syncobjs.TCriticalSection.Create;
     ErrorCS.Enter;
     try
-      oldXHandler:=XSetErrorHandler(@MufasaXErrorHandler);
+      //oldXHandler:=XSetErrorHandler(@MufasaXErrorHandler);
     finally
       ErrorCS.Leave;
     end;
+
+    XSynchronize(display, true);
 
     UpdateImage(True);
   end;
@@ -265,22 +272,34 @@ implementation
 
   procedure TWindow.UpdateImage(First: Boolean);
   var
-      vis: PVisual;
+     foo, major, minor, pixmaps: integer;
   begin
     writeln('UpdateImage: ', First);
     if not First then
       FreeImage;
 
-    vis := XDefaultVisual(display, screennum);
-
     GetTargetDimensions(sw, sh);
     writeln('sw, sh: ', sw, ' ', sh);
 
-    //buffer := XCreateImage(display, vis, 32, ZPixmap, 0, buf_ptr, sw, sh, 32, sw * 4);
-    buffer := XShmCreateImage(display, vis, 32, ZPixmap, nil, @shminfo, sw, sh);
-    writeln('buffer w, h: ' , buffer^.width, ' ', buffer^.height);
+    if XQueryExtension(display, 'MIT-SHM',@foo, @foo, @foo) then
+    begin
+      if XShmQueryVersion(display, @major, @minor, @pixmaps) then
+      begin
+        writeln(format('XShm extension version %d.%d shared pixmaps: %d',
+               [major, minor, pixmaps]));
+      end;
+    end;
 
+    //buffer := XCreateImage(display, vis, 32, ZPixmap, 0, buf_ptr, sw, sh, 32, sw * 4);
+    buffer := XShmCreateImage(display, DefaultVisualOfScreen(screen),
+    DefaultDepthOfScreen(screen), ZPixmap, nil, @shminfo, sw, sh);
+    //writeln('buffer w, h: ' , buffer^.width, ' ', buffer^.height);
+
+    //writeln('Size in bytes: ', buffer^.bytes_per_line * buffer^.height);
     shminfo.shmid:= shmget(IPC_PRIVATE, buffer^.bytes_per_line * buffer^.height, IPC_CREAT or 0777);
+//    shminfo.shmid:= shmget(IPC_PRIVATE, buffer^.bytes_per_line * buffer^.height, IPC_CREAT or 0777);
+    //writeln('Errno: ', fpgeterrno);
+    //writeln('SHMID: ', shminfo.shmid);
     shminfo.shmaddr := shmat(shminfo.shmid, nil, 0);
     buffer^.data := shminfo.shmaddr;
     shminfo.readOnly := 1;
@@ -382,7 +401,9 @@ implementation
     ret := XShmGetImage(display, window, buffer, 0, 0, AllPlanes);
     // XShmGetImage
 
-    if ret = 0 then
+    writeln(ret);
+
+    if ret = 1 then
     begin
       mDebugLn('ReturnData: XShmGetImage Error. Dumping data now:');
       mDebugLn('xs, ys, width, height: ' + inttostr(xs) + ', '  + inttostr(ys) +
