@@ -1,5 +1,3 @@
-XXX: This will not work when the window resizes, so it''s probably useless.
-
 {
 	This file is part of the Mufasa Macro Library (MML)
 	Copyright (c) 2009-2012 by Raymond van Venetië and Merlijn Wajer
@@ -78,6 +76,9 @@ interface
 
         function GetNativeWindow: TNativeWindow;
       private
+        procedure UpdateImage;
+        procedure FreeImage;
+      private
         { display is the connection to the X server }
         display: PDisplay;
 
@@ -89,10 +90,10 @@ interface
         buffer: PXImage;
 
         { Image Data Pointer }
-        buf_ptr: PByte;
+        buf_ptr: PChar;
 
-        { For memory-leak checks }
-        dirty: Boolean;  //true if image loaded
+        { Stored Width / Height }
+        sw, sh: Integer;
 
         { KeyInput class }
         keyinput: TKeyInput;
@@ -219,14 +220,11 @@ implementation
 
   { See if the semaphores / CS are initialised }
   constructor TWindow.Create(display: PDisplay; screennum: integer; window: x.TWindow);
-  var
-      vis: PVisual;
   begin
     inherited Create;
     self.display:= display;
     self.screennum:= screennum;
     self.window:= window;
-    self.dirty:= false;
     self.keyinput:= TKeyInput.Create;
 
     xerror := '';
@@ -241,24 +239,14 @@ implementation
       ErrorCS.Leave;
     end;
 
-    vis := XDefaultVisual(display, screennum);
-    writeln('Bits per rgb: ', vis^.bits_per_rgb);
-    writeln('Red mask: ', vis^.red_mask);
-    writeln('Green mask: ', vis^.green_mask);
-    writeln('Blue mask: ', vis^.blue_mask);
-
-    // Depth = 24 ?
-    // Bitmap_Pad = 32
-    // TODO: visual
-    buf_ptr := AllocMem(SizeOf(Byte) * 4 * ww * hh);
-    buffer := XCreateImage(display, vis, 32, ZPixmap, 0, bufptr, ww, hh, 32, ww * 4);
+    UpdateImage;
   end;
 
   destructor TWindow.Destroy;
     var
       erh: TXErrorHandler;
   begin
-    FreeReturnData;
+    FreeImage;
     keyinput.Free;
 
     { XXX FIXME TODO O GOD WTF }
@@ -274,6 +262,40 @@ implementation
       ErrorCS.Leave;
     end;
     inherited Destroy;
+  end;
+
+  procedure TWindow.UpdateImage;
+  var
+      vis: PVisual;
+  begin
+    FreeImage;
+
+    vis := XDefaultVisual(display, screennum);
+    //writeln('Bits per rgb: ', vis^.bits_per_rgb);
+    //writeln('Red mask: ', vis^.red_mask);
+    //writeln('Green mask: ', vis^.green_mask);
+    //writeln('Blue mask: ', vis^.blue_mask);
+
+    // Depth = 24 ?
+    // Bitmap_Pad = 32
+    GetTargetDimensions(sw, sh);
+    buf_ptr := AllocMem(SizeOf(Byte) * 4 * sw * sh);
+    buffer := XCreateImage(display, vis, 32, ZPixmap, 0, buf_ptr, sw, sh, 32, sw * 4);
+  end;
+
+  procedure TWindow.FreeImage;
+  begin
+    if Assigned(buffer) then
+    begin
+      buffer^.data := nil;
+      XDestroyImage(buffer);
+    end;
+    buffer := nil;
+
+    if Assigned(buf_ptr) then
+      FreeMem(buf_ptr);
+    { buf_ptr is freed by XDestroyImage }
+    buf_ptr := nil;
   end;
 
   function TWindow.GetNativeWindow: TNativeWindow;
@@ -333,28 +355,29 @@ implementation
   function TWindow.ReturnData(xs, ys, width, height: Integer): TRetData;
   var
     w,h: integer;
+    ret: Pointer;
   begin
-    GetTargetDimensions(w,h);
+    GetTargetDimensions(w, h);
+
+    if(w <> sw) or (h <> sh) then
+    begin
+      //writeln('ReturnData - Updating Image');
+      UpdateImage;
+    end;
+
     if (xs < 0) or (xs + width > w) or (ys < 0) or (ys + height > h) then
       raise Exception.CreateFMT('TMWindow.ReturnData: The parameters passed are wrong; xs,ys %d,%d width,height %d,%d',[xs,ys,width,height]);
-    if dirty then
-      raise Exception.CreateFmt('ReturnData was called again without freeing'+
-                                ' the previously used data. Do not forget to'+
-                                ' call FreeReturnData', []);
 
-    {
-    XGetSubImage(display, window, xs, ys, width, height, AllPlaces, ZPixmap,
-        buffer, 0, 0);
-    }
+    ret := XGetSubImage(display, window, xs, ys, width, height, AllPlanes, ZPixmap, buffer, 0, 0);
 
-    buffer := XGetImage(display, window, xs, ys, width, height, AllPlanes, ZPixmap);
-    writeln('Depth: ', buffer^.depth);
-    writeln('bytes_per_line ', buffer^.bytes_per_line);
-    writeln('bits per pixel ', buffer^.bits_per_pixel);
-    writeln('bitmap_pad ', buffer^.bitmap_pad);
+    //writeln('Depth: ', buffer^.depth);
+    //writeln('bytes_per_line ', buffer^.bytes_per_line);
+    //writeln('bits per pixel ', buffer^.bits_per_pixel);
+    //writeln('bitmap_pad ', buffer^.bitmap_pad);
+
     if buffer = nil then
     begin
-      mDebugLn('ReturnData: XGetImage Error. Dumping data now:');
+      mDebugLn('ReturnData: XGetSubImage Error. Dumping data now:');
       mDebugLn('xs, ys, width, height: ' + inttostr(xs) + ', '  + inttostr(ys) +
               ', ' + inttostr(width) + ', ' + inttostr(height));
       Result.Ptr := nil;
@@ -362,23 +385,19 @@ implementation
       raise Exception.CreateFMT('TMWindow.ReturnData: ReturnData: XGetImage Error', []);
       exit;
     end;
+
     Result.Ptr := PRGB32(buffer^.data);
-    Result.IncPtrWith := 0;
-    Result.RowLen := width;
-    dirty:= true;
+    Result.IncPtrWith := (buffer^.bytes_per_line shr 2) * (sw - width);
+    //writeln('Result.IncPtrWith: ', Result.IncPtrWith);
+    Result.RowLen := sw;
     //XSetErrorHandler(Old_Handler);
   end;
 
   procedure TWindow.FreeReturnData;
   begin
+    Exit; { Nothing to do }
+
     { TODO: Only free on destruction of class }
-    if dirty then
-    begin
-      if (buffer <> nil) then
-        XDestroyImage(buffer);
-      buffer:= nil;
-      dirty:= false;
-    end;
   end;
 
   procedure TWindow.GetMousePosition(out x,y: integer);
