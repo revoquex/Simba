@@ -2544,7 +2544,7 @@ begin
     end;
   end;
 
-  InitializeTMThread(Thread);
+  InitializeTMThread(TMThread(Thread));
   if (not Assigned(Thread)) then
     Exit;
 
