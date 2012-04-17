@@ -1231,6 +1231,10 @@ begin
   if CurrThread <> nil then
     exit;
 
+  writeln('No script for you!');
+  exit;
+
+
   with CurrScript do
   begin
     if ScriptState = ss_Paused then
