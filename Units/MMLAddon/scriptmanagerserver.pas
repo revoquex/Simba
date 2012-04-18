@@ -135,7 +135,16 @@ begin
 end;
 
 procedure TScriptProcessManager.Stop;
+var
+    script: TScriptCommunication;
 begin
+  while FScripts.Count <> 0 do
+  begin
+    script := TScriptCommunication(FScripts.Items[0]);
+    script.StopScript;
+    FScripts.Delete(0);
+    script.Free;
+  end;
   { TODO: Clean up here }
 
   FIPCServer.StopServer;
@@ -284,6 +293,7 @@ end;
 
 procedure TScriptCommunication.StopScript;
 begin
+  FIPCClient.SendStringMessage('stop');
   { Don't really need this right now }
 end;
 

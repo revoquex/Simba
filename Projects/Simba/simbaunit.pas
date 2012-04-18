@@ -60,7 +60,8 @@ uses
   PSDump,
 
   updater,
-  newsimbasettings;
+  newsimbasettings,
+  scriptmanagerserver;
 
 const
   interp_PS = 0; //PascalScript
@@ -1227,9 +1228,40 @@ end;
 //{$ENDIF}
 
 procedure TSimbaForm.RunScript;
+
+var
+  server: TScriptProcessManager;
+  c, c2: TScriptCommunication;
+  t: Integer;
 begin
   if CurrThread <> nil then
     exit;
+
+  server := TScriptProcessManager.Create();
+  server.Start();
+
+  c := TScriptCommunication.Create(server);
+
+  c.startscript();
+
+  c2 := TScriptCommunication.Create(server);
+
+  c2.startscript();
+
+  t := GetTickCount;
+
+  while true do
+  begin
+    if GetTickCount - t > 5000 then
+      break;
+    server.HandleEvents;
+    sleep(50);
+  end;
+
+  server.Stop;
+  server.Free;
+
+
 
   writeln('No script for you!');
   exit;
