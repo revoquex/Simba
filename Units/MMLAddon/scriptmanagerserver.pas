@@ -52,20 +52,29 @@ uses
   { For TSimpleIPC(Client,Server) }
   simpleipc;
 
+const
+  scWaitIdent = 0;
+  scReady = 1;
+
 type
 
   TScriptProcessManager = class(TObject)
   private
-    FIPCServer: TSimpleIPCServer;
+
+    FScripts: TList;
     // TScriptCommunication list (one for each script)
 
   public
+    FIPCServer: TSimpleIPCServer;   { TODO Make private }
+
     constructor Create;
     destructor Destroy;
 
     procedure Start;
     procedure Stop;
+    procedure Add(O: TObject);
     procedure HandleEvents;
+
 
   end;
 
@@ -74,16 +83,19 @@ type
     FIPCClient: TSimpleIPCClient; { IPC Client to the Scripts server }
     FParent: TScriptProcessManager; { The parent - we need this for the server }
     FProcess: TProcess; { The script process }
+    FState: Integer; { State }
+    FIdent: String;
   public
     constructor Create(Parent: TScriptProcessManager);
     destructor Destroy;
-    procedure SetupConnection;
+    procedure SetupConnection(ident: String);
 
     procedure StartScript;
     procedure StopScript;
     procedure SuspendScript;
 
     procedure WriteTo(s: String);
+    procedure HandleMessage(s: String);
     procedure RecieveFrom(s: String);
     procedure HasMessage(s: String);
     // Several procedures to set up initial communication per script.
@@ -99,15 +111,22 @@ begin
   FIPCServer := TSimpleIPCServer.Create(nil);
   FIPCServer.ServerID := 'Simba';
   FIPCServer.Global := False;
-  { Foo }
+
+  FScripts := TList.Create;
 end;
 
 destructor TScriptProcessManager.Destroy;
 
 begin
-  { Foo }
+  { TODO kill all scripts? }
+  FScripts.Free;
 
   inherited;
+end;
+
+procedure TScriptProcessManager.Add(O: TObject);
+begin
+  FScripts.Add(Pointer(O));
 end;
 
 procedure TScriptProcessManager.Start;
@@ -161,7 +180,9 @@ end;
 procedure TScriptProcessManager.HandleEvents;
 
 var
+    i: integer;
     s, c, m: String;
+    script: TScriptCommunication;
 
 begin
   if not FIPCServer.PeekMessage(0, False) then
@@ -169,13 +190,39 @@ begin
 
   while True do
   begin
+    sleep(15);
     if not FIPCServer.PeekMessage(0, True) then
       exit;
     s := FIPCServer.StringMessage;
     c := ''; m := '';
-    ParseMessage(s, c, m);
+    if not ParseMessage(s, c, m) then
+    begin
+      Writeln('Ignoring message: ' + s);
+      Continue;
+    end;
+
     writeln(format('Message from "%s": "%s"', [c, m]));
-    // Do proper stuff here based on message and client.
+
+    script := nil;
+    for i := 0 to FScripts.Count - 1 do
+    begin
+      writeln('Found ident: ' + TScriptCommunication(FScripts.Items[i]).FIdent);
+      if TScriptCommunication(FScripts.Items[i]).FIdent = c then
+      begin
+        script := TScriptCommunication(FScripts.Items[i]);
+        Writeln('Found script match');
+        break;
+      end;
+    end;
+
+    if Assigned(script) then
+    begin
+      writeln('Passing message ' + m + ' to script ' + s);
+      script.HandleMessage(m);
+    end else
+    begin
+        writeln('No script match');
+    end;
   end;
 end;
 
@@ -184,6 +231,10 @@ begin
   //inherited;
 
   FParent := Parent;
+  FState := scWaitIdent;
+  FIdent := '';
+
+  Parent.Add(Self);
 end;
 
 destructor TScriptCommunication.Destroy;
@@ -197,18 +248,37 @@ end;
   Call this once the parent server has recieved the ID of the clients server to
   which we will send messages.
 }
-procedure TScriptCommunication.SetupConnection;
+procedure TScriptCommunication.SetupConnection(ident: String);
 begin
   FIPCClient := TSimpleIPCClient.Create(nil);
 
   { Retrieve these from the client, we need the ID
     So this is only called once the client has send us its ID }
-  FIPCClient.ServerID := '';  { TODO GET VALUE }
-  FIPCClient.ServerInstance := ''; { TODO GET VALUE }
+  FIPCClient.ServerID := 'SimbaClient'; { TODO GET VALUE }
+  FIPCClient.ServerInstance := IntToStr(FProcess.ProcessId);
+
+  FState := scReady;
+
+  try
+    FIPCClient.Connect;
+    FIPCClient.Active := True;
+    FIPCClient.SendStringMessage('ACK');
+  except { TODO: Proper exception + message + error handling }
+    Writeln('WHOOPS');
+    { TODO: Kill client }
+  end;
 end;
 
 procedure TScriptCommunication.StartScript;
 begin
+  FProcess := TProcess.Create(nil); { TODO Owner }
+
+  FProcess.CommandLine := '/tmp/client' + ' ' + FParent.FIPCServer.InstanceID;
+
+  FProcess.Execute;
+
+  FIdent := IntToStr(FProcess.ProcessID);
+  writeln('Started process: ', FProcess.ProcessID);
   { TProcess magic here }
 end;
 
@@ -225,6 +295,22 @@ end;
 procedure TScriptCommunication.WriteTo(s: String);
 begin
   FIPCClient.SendStringMessage(s);
+end;
+
+procedure TScriptCommunication.HandleMessage(s: String);
+begin
+  case FState of
+    scWaitIdent:
+        begin
+          SetupConnection(s);
+        end;
+    scReady:
+        begin
+          writeln('Message: ' + s);
+          if s = 'quit' then
+              StopScript;
+        end;
+  end;
 end;
 
 procedure TScriptCommunication.RecieveFrom(s: String);
