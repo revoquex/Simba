@@ -1,4 +1,4 @@
-unit scriptmanagerserver;
+unit simbamp;
 
 {
   This file is part of the Mufasa Macro Library (MML)
@@ -34,6 +34,15 @@ Notes:
 TODO:
 
     - Define a protocol which clients should follow.
+    - Implement exception handling where required (pretty much everywhere)
+    - Implement events (as procedure of object probably).
+      Events:
+        Simba:
+          - OnWriteln (or something)
+          - OnScriptStop
+
+        Client:
+          - OnStop
 
 TODO MAYBE:
     - Change SimpleIPC(Client|Server).Create calls to use our own classes.
@@ -112,14 +121,26 @@ type
   { Communication from script process -> Simba }
 
   TScriptSideCommunication = class(TObject)
+  private
+    FServer: TSimpleIPCServer;
+    FMaster: TSimpleIPCClient;
+
+  public
+    EventStop: procedure of object;
 
     constructor Create;
     destructor Destroy;
 
 
-    procedure ConnectToMaster;
+    procedure ConnectToMaster(InstanceID: String);
     procedure SetupServer;
 
+    procedure DisconnectFromMaster;
+    procedure StopServer;
+
+    procedure HandleEvents;
+
+    procedure WriteMessage(s: String);
   end;
 
 implementation
@@ -220,7 +241,6 @@ begin
 
   while True do
   begin
-    sleep(15);
     if not FIPCServer.PeekMessage(0, True) then
       exit;
     s := FIPCServer.StringMessage;
@@ -321,13 +341,23 @@ end;
 
 procedure TScriptCommunication.StopScript;
 begin
-  FIPCClient.SendStringMessage('stop');
   { Don't really need this right now }
+  { We should probably tell the process it will be stopped first? }
+  FIPCClient.SendStringMessage('stop');
+
+  {
+  sleep(100);
+  FProcess.Terminate(0);   }
+
+  { This is obviously not safe }
+  FProcess.WaitOnExit;
+  FProcess.Free;
 end;
 
 procedure TScriptCommunication.SuspendScript;
 begin
   { Should we notify the process? How? }
+  { We should probably tell the process it will be suspended first? }
   FProcess.Suspend;
 end;
 
@@ -375,11 +405,16 @@ begin
 end;
 
 
+{ TScriptSideCommunication }
 constructor TScriptSideCommunication.Create;
 begin
   //inherited;
 
+  FServer := TSimpleIPCServer.Create(nil);
 
+  FMaster := TSimpleIPCClient.Create(nil);
+
+  EventStop := nil;
 end;
 
 destructor TScriptSideCommunication.Destroy;
@@ -389,14 +424,78 @@ begin
   //inherited;
 end;
 
-procedure TScriptSideCommunication.ConnectToMaster;
+procedure TScriptSideCommunication.ConnectToMaster(InstanceID: String);
 begin
+  FMaster.ServerID := 'Simba';
+  FMaster.ServerInstance := InstanceID;
 
+  FMaster.Connect;
+  FMaster.Active := True;
+end;
+
+procedure TScriptSideCommunication.DisconnectFromMaster;
+begin
+  FMaster.Active := False;
+  FMaster.Disconnect;
+  FMaster.Free;
 end;
 
 procedure TScriptSideCommunication.SetupServer;
 begin
+  FServer.Global := False;
 
+  FServer.ServerID := 'SimbaClient';
+  FServer.StartServer;
+
+  { Tell the Master about our server }
+  FMaster.SendStringMessage(FServer.InstanceID + ': Done');
+end;
+
+procedure TScriptSideCommunication.StopServer;
+begin
+  FServer.StopServer;
+  FServer.Free;
+end;
+
+procedure TScriptSideCommunication.HandleEvents;
+
+var
+    i: integer;
+    s: String;
+
+begin
+  if not FServer.PeekMessage(0, False) then
+    exit;
+
+  while True do
+  begin
+    if not FServer.PeekMessage(0, True) then
+        break;
+    s := FServer.StringMessage;
+    begin
+      if s = 'stop' then
+      begin
+        writeln('We should stop!');
+        if Assigned(EventStop) then
+        begin
+          writeln('Calling EventStop');
+          EventStop();
+        end
+        else
+        begin
+          writeln('Throwing exception');
+          Exception.Create('Recieved stop and no stop handler');
+        end;
+
+        { XXX TODO: Do something useful. Perhaps events? }
+      end;
+    end;
+  end;
+end;
+
+procedure TScriptSideCommunication.WriteMessage(s: String);
+begin
+  FMaster.SendStringMessage(FServer.InstanceID + ': ' + s);
 end;
 
 end.

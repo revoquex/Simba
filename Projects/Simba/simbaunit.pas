@@ -61,7 +61,7 @@ uses
 
   updater,
   newsimbasettings,
-  scriptmanagerserver;
+  simbamp;
 
 const
   interp_PS = 0; //PascalScript
