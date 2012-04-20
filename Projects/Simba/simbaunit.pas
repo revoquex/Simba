@@ -1240,6 +1240,8 @@ begin
   server := TScriptProcessManager.Create();
   server.Start();
 
+  server.writeln_procedure := @formwriteln;
+
   c := TScriptCommunication.Create(server);
 
   c.startscript();
@@ -1256,12 +1258,11 @@ begin
       break;
     server.HandleEvents;
     sleep(50);
+    Application.ProcessMessages;
   end;
 
   server.Stop;
   server.Free;
-
-
 
   writeln('No script for you!');
   exit;

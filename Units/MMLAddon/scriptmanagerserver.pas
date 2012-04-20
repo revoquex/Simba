@@ -58,6 +58,9 @@ const
 
 type
 
+  TWritelnProc = procedure(s: string);
+
+  { Manager for Simba or some other daemon }
   TScriptProcessManager = class(TObject)
   private
 
@@ -75,9 +78,13 @@ type
     procedure Add(O: TObject);
     procedure HandleEvents;
 
+  public
+    writeln_procedure: TWritelnProc;
+
 
   end;
 
+  { Communication from Simba some daemon to the script }
   TScriptCommunication = class(TObject)
   private
     FIPCClient: TSimpleIPCClient; { IPC Client to the Scripts server }
@@ -93,12 +100,26 @@ type
     procedure StartScript;
     procedure StopScript;
     procedure SuspendScript;
+    procedure ResumeScript;
 
     procedure WriteTo(s: String);
     procedure HandleMessage(s: String);
     procedure RecieveFrom(s: String);
     procedure HasMessage(s: String);
     // Several procedures to set up initial communication per script.
+  end;
+
+  { Communication from script process -> Simba }
+
+  TScriptSideCommunication = class(TObject)
+
+    constructor Create;
+    destructor Destroy;
+
+
+    procedure ConnectToMaster;
+    procedure SetupServer;
+
   end;
 
 implementation
@@ -230,7 +251,7 @@ begin
       script.HandleMessage(m);
     end else
     begin
-        writeln('No script match');
+      writeln('No script match');
     end;
   end;
 end;
@@ -249,6 +270,9 @@ end;
 destructor TScriptCommunication.Destroy;
 begin
   { Foo }
+
+  if assigned(FIPCClient) then
+    FIPCClient.Free;
 
   inherited;
 end;
@@ -278,6 +302,11 @@ begin
   end;
 end;
 
+{
+  TODO:
+      - Update this with new TProcess API
+      - Pass arguments and binary location.
+}
 procedure TScriptCommunication.StartScript;
 begin
   FProcess := TProcess.Create(nil); { TODO Owner }
@@ -288,7 +317,6 @@ begin
 
   FIdent := IntToStr(FProcess.ProcessID);
   writeln('Started process: ', FProcess.ProcessID);
-  { TProcess magic here }
 end;
 
 procedure TScriptCommunication.StopScript;
@@ -299,7 +327,13 @@ end;
 
 procedure TScriptCommunication.SuspendScript;
 begin
-  { Don't really need this right now }
+  { Should we notify the process? How? }
+  FProcess.Suspend;
+end;
+
+procedure TScriptCommunication.ResumeScript;
+begin
+  FProcess.Resume;
 end;
 
 procedure TScriptCommunication.WriteTo(s: String);
@@ -317,8 +351,15 @@ begin
     scReady:
         begin
           writeln('Message: ' + s);
+
           if s = 'quit' then
-              StopScript;
+              StopScript
+
+          else
+            if Assigned(FParent.writeln_procedure) then
+              FParent.writeln_procedure(s)
+            else
+              writeln('Client ' + FIdent + ' writes: ' + s);
         end;
   end;
 end;
@@ -331,6 +372,31 @@ end;
 procedure TScriptCommunication.HasMessage(s: String);
 begin
   { Leave this empty }
+end;
+
+
+constructor TScriptSideCommunication.Create;
+begin
+  //inherited;
+
+
+end;
+
+destructor TScriptSideCommunication.Destroy;
+begin
+
+
+  //inherited;
+end;
+
+procedure TScriptSideCommunication.ConnectToMaster;
+begin
+
+end;
+
+procedure TScriptSideCommunication.SetupServer;
+begin
+
 end;
 
 end.
