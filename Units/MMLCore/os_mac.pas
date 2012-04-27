@@ -109,9 +109,6 @@ interface
         procedure NativeInit; override;
         procedure NativeFree; override;
       public
-        display: PDisplay;
-        screennum: integer;
-        desktop: x.TWindow;
     end;
 
 implementation
@@ -145,8 +142,8 @@ uses GraphType, interfacebase, lcltype;
     // TODO
   end;
 
-  { See if the semaphores / CS are initialised }
-  constructor TWindow.Create(display: PDisplay; screennum: integer; window: x.TWindow);
+  constructor TWindow.Create();
+  //constructor TWindow.Create(display: PDisplay; screennum: integer; window: x.TWindow);
   begin
     // TODO
   end;
@@ -279,7 +276,7 @@ uses GraphType, interfacebase, lcltype;
     // SetBothTargets(TWindow.Create(display, screennum, desktop));
   end;
 
-  function TIOManager.SetTarget(target: x.TWindow): integer;
+  function TIOManager.SetTarget({TODO}): integer;
   begin
     // TODO
     //result := SetBothTargets(TWindow.Create(display, screennum, target))
