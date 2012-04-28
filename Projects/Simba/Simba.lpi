@@ -32,7 +32,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <LaunchingApplication PathPlusParams="/usr/bin/gnome-terminal -t 'Lazarus Run Output' -e '$(LazarusDir)/tools/runwait.sh $(TargetCmdLine)'"/>
+        <LaunchingApplication Use="True" PathPlusParams="/usr/bin/gnome-terminal -t 'Lazarus Run Output' -e '$(LazarusDir)/tools/runwait.sh $(TargetCmdLine)'"/>
       </local>
     </RunParams>
     <RequiredPackages Count="2">
@@ -336,8 +336,8 @@
       <Filename Value="../../Simba"/>
     </Target>
     <SearchPaths>
-      <IncludeFiles Value="$(ProjOutDir);$(ProjPath)../../Units/MMLAddon/PSInc;$(ProjPath)../../Units/MMLAddon/LPInc"/>
-      <OtherUnitFiles Value="$(ProjPath);$(ProjPath)../../Units/MMLCore;$(ProjPath)../../Units/MMLAddon;$(ProjPath)../../Units/PascalScript;$(ProjPath)../../Units/lape;$(ProjPath)../../Units/Misc;$(ProjPath)../../Units/Misc/DCPCrypt;$(ProjPath)../../Units/Misc/DCPCrypt/Hashes;$(ProjPath)../../Units/Misc/DCPCrypt/Ciphers;$(ProjPath)../../Units/MMLAddon/PSInc;$(ProjPath)../../Units/Linux;$(ProjPath)../../Units/Synapse;$(LazarusDir)/components/mouseandkeyinput;$(ProjPath)../../Units/RUTIS"/>
+      <IncludeFiles Value="$(ProjOutDir);$(ProjPath)../../Units/MMLAddon/PSInc;$(ProjPath)../../Units/MMLAddon/LPInc;$(ProjPath)../../Units/lape"/>
+      <OtherUnitFiles Value="$(ProjPath);$(ProjPath)../../Units/MMLCore;$(ProjPath)../../Units/MMLAddon;$(ProjPath)../../Units/PascalScript;$(ProjPath)../../Units/lape;$(ProjPath)../../Units/Misc;$(ProjPath)../../Units/Misc/DCPCrypt;$(ProjPath)../../Units/Misc/DCPCrypt/Hashes;$(ProjPath)../../Units/Misc/DCPCrypt/Ciphers;$(ProjPath)../../Units/MMLAddon/PSInc;$(ProjPath)../../Units/Linux;$(ProjPath)../../Units/Synapse;$(LazarusDir)/components/mouseandkeyinput;$(ProjPath)../../Units/RUTIS;$(ProjPath)../../Units/lape/extensions/ffi"/>
       <UnitOutputDirectory Value="$(ProjPath)../../build/$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
@@ -367,10 +367,13 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="1">
+    <Exceptions Count="2">
       <Item1>
         <Name Value="ESyntaxError"/>
       </Item1>
+      <Item2>
+        <Name Value="Exception"/>
+      </Item2>
     </Exceptions>
   </Debugging>
 </CONFIG>

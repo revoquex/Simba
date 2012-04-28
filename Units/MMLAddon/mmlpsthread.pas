@@ -42,7 +42,7 @@ uses
   {$ENDIF}
   {$IFDEF USE_LAPE}
   , lpparser, lpcompiler, lptypes, lpvartypes,
-    lpeval, lpinterpreter, lputils
+    lpeval, lpinterpreter, lputils, ffi, lpffi
   {$ENDIF};
 
 const
@@ -249,9 +249,21 @@ type
    {$ENDIF}
 
    {$IFDEF USE_LAPE}
+   
+   TClosureData = record
+     native_func: Pointer;
+     lapeCIF: TFFICifManager;
+     closure: PFFIClosure;
+     closure_cif: TFFICif;
+     closure_args: PPFFIType;
+   end;
+
+   PClosureData = ^TClosureData;
+
    { TLPThread }
    TLPThread = class(TMThread)
    protected
+     closures: array of PClosureData;
      procedure LoadPlugin(plugidx: integer); override;
    public
      Parser: TLapeTokenizerString;
@@ -1369,6 +1381,8 @@ var
 begin
   inherited Create(CreateSuspended, TheSyncInfo, plugin_dir);
 
+  SetLength(closures,0);
+
   Parser := TLapeTokenizerString.Create('');
   Compiler := TLapeCompiler.Create(Parser);
   Running := bFalse;
@@ -1401,6 +1415,8 @@ begin
 end;
 
 destructor TLPThread.Destroy;
+var
+  i: integer;
 begin
   try
     if (Assigned(Compiler)) then
@@ -1411,7 +1427,13 @@ begin
     on E: Exception do
       psWriteln('Exception TLPThread.Destroy: ' + e.message);
   end;
-
+  for i:= 0 to Length(closures)-1 do
+  begin
+   closures[i]^.lapeCIF.Free;
+   ffi_closure_free(closures[i]^.closure);
+   FreeMem(closures[i]^.closure_args);
+   FreeMem(closures[i]);
+  end;
   inherited Destroy;
 end;
 
@@ -1463,9 +1485,17 @@ begin
   end;
 end;
 
+procedure LPBridge(var cif: TFFICif; ret: Pointer; var args: TPointerArray; data: PClosureData); cdecl;
+begin
+  data^.lapeCIF.Call(data^.native_func,args[1],args[0],true); //That's easy enough
+end;
+
 procedure TLPThread.LoadPlugin(plugidx: integer);
 var
   I: integer;
+  s: TFFIStatus;
+  data: PClosureData;
+  func: Pointer;
 begin
   with PluginsGlob.MPlugins[plugidx] do
   begin
@@ -1477,8 +1507,26 @@ begin
 
     for i := 0 to MethodLen - 1 do
       with Methods[i] do
-        Compiler.addGlobalFunc(FuncStr, FuncPtr);
-
+      begin
+        data:= GetMem(sizeof(TClosureData));
+        data^.native_func:= FuncPtr;
+        data^.lapeCIF:= LapeHeaderToFFICif(Compiler, FuncStr, FFI_DEFAULT_ABI); //linux can't do stdcall. Should proably make plugins only use cdecl (everything is the same on x64)
+        data^.closure:= ffi_closure_alloc(sizeof(TFFIClosure), @func);
+        data^.closure_args:= GetMem(sizeof(PFFIType)*2);
+        (data^.closure_args)[0]:= @ffi_type_pointer;
+        (data^.closure_args)[1]:= @ffi_type_pointer;
+        s:= ffi_prep_cif(data^.closure_cif, FFI_DEFAULT_ABI, 1, @ffi_type_void, data^.closure_args); //convention should be whatever LAPE expects (everything is the same on x64)
+        if s = FFI_OK then
+        begin
+          s := ffi_prep_closure_loc(data^.closure, data^.closure_cif, TClosureBindingFunction(@LPBridge), data, func);
+          if s = FFI_OK then
+          begin
+            Compiler.addGlobalFunc(FuncStr, func);
+          end;
+        end;
+        SetLength(closures,Length(closures)+1);
+        closures[Length(closures)-1]:= data;
+      end;
     Compiler.EndImporting;
   end;
 end;
