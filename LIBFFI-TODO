@@ -1,0 +1,6 @@
+Merge in Simba 1.0 (Perhaps backport to Simba 0.99 later)
+
+-   Change Plugin ABI. (Change names of functions to prevent calling convention
+mess)
+-   Work on callbacks (for forms, etc)
+    -   Make a findcolors with compare callback using libffi in scripts.
