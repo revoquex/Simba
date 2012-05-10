@@ -116,7 +116,7 @@ GetFunctionInfo
 
 .. code-block:: pascal
 
-  GetFunctionInfo: function(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar): integer; stdcall;
+  function GetFunctionInfo(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar): integer;
 
 Simba will then call *GetFunctionInfo* and *GetFunctionCallingConv* **N**
 amount of times (where **N** is the result of *GetFunctionCount*) with
@@ -136,7 +136,7 @@ GetFunctionCallingConv
 
 .. code-block:: pascal
 
-  GetFunctionCallingConv: function(x: integer): integer; stdcall;
+  function GetFunctionCallingConv(x: integer): integer; stdcall;
 
 *GetFunctionCallingConv* returns the calling convention for the specific
 function. Currently, the only two support conventions are *stdcall* (0) and
@@ -197,4 +197,111 @@ To share arrays and strings in a nice way with a FPC plugin, you need to create
 a function called SetPluginMemManager as shown above and make sure it is
 exported properly. Simba will try to call this function when loading the plugin
 and will pass the plugin its own memory manager. Use FPC's *SetMemoryManager* to
-change your own memory manager to Simba's memory manager.
+change your own memory manager to Simba's memory manager. When *OnDetach* is
+called, make sure you reset your memory manager. See `SetPluginMemManager`_.
+
+Sample FPC Plugin
+-----------------
+
+.. code-block:: pascal
+
+    { Example based upon the SPS Plugin }
+    library mylibrary;
+
+    {$mode objfpc}{$H+}
+
+    {$macro on}
+    {$define callconv:=
+        {$IFDEF WINDOWS}{$IFDEF CPU32}cdecl;{$ELSE}{$ENDIF}{$ENDIF}
+        {$IFDEF LINUX}{$IFDEF CPU32}cdecl;{$ELSE}{$ENDIF}{$ENDIF}
+    }
+
+    uses
+      classes, sysutils, fileutil, math, interfaces, mufasatypes, bitmaps,
+      colour_conv
+      { you can add units after this };
+
+    type
+      T3DIntegerArray = array of T2DIntegerArray;
+
+    var
+      OldMemoryManager: TMemoryManager;
+      memisset: Boolean = False;
+
+    function HelloPlugin(s: String): String; callconv
+    begin
+      result := s;
+    end;
+
+    function GetPluginABIVersion: Integer; callconv export;
+    begin
+      Result := 2;
+    end;
+
+    procedure SetPluginMemManager(MemMgr : TMemoryManager); callconv export;
+    begin
+      if memisset then
+        exit;
+      GetMemoryManager(OldMemoryManager);
+      SetMemoryManager(MemMgr);
+      memisset := true;
+    end;
+
+    procedure OnDetach; callconv export;
+    begin
+      SetMemoryManager(OldMemoryManager);
+    end;
+
+    function GetTypeCount(): Integer; callconv export;
+    begin
+      Result := 1;
+    end;
+
+    function GetTypeInfo(x: Integer; var sType, sTypeDef: PChar): integer; callconv export;
+    begin
+      case x of
+        0: begin
+            StrPCopy(sType, 'T3DIntegerArray');
+            StrPCopy(sTypeDef, 'array of T2DIntegerArray;');
+           end;
+
+        else
+          x := -1;
+      end;
+
+      Result := x;
+    end;
+
+    function GetFunctionCount(): Integer; callconv export;
+    begin
+      Result := 1;
+    end;
+
+    function GetFunctionInfo(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar): Integer; callconv export;
+    begin
+      case x of
+        0:
+          begin
+            ProcAddr := @HelloPlugin;
+            StrPCopy(ProcDef, 'function HelloPlugin(s: String): String;');
+          end;
+
+        else
+          x := -1;
+      end;
+
+      Result := x;
+    end;
+
+    exports GetPluginABIVersion;
+    exports SetPluginMemManager;
+    exports GetTypeCount;
+    exports GetTypeInfo;
+    exports GetFunctionCount;
+    exports GetFunctionInfo;
+    exports GetFunctionCallingConv;
+    exports OnDetach;
+
+    begin
+    end.
+
