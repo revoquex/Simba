@@ -3,86 +3,61 @@
 Writing Simba Plugins
 =====================
 
-.. warning::
-    This is work in progress.
-
 Plugin overview
 ---------------
 
 Plugins for Simba can be written in virtually every language. (Make sure to read
 `Caveats`_ though)
 
-Calling Conventions
--------------------
+Simba Plugin ABI
+----------------
 
-Currently, all methods in `Simba Plugin Functions`_ must follow the *stdcall*
-calling convention on x86 architectures. On x64 the native calling convention of
-the operating system is used, this convention differs per platform. As long as
-you don't define the calling convention you should be fine.
+First of all, it is important to know in what way you should represent your
+functions to Simba. Using the newest ABI is recommended. Currently, all three
+ABIs are supported; but older ones may be deprecated in subsequent releases.
 
-.. warning::
+Simba ABI Version 0
+*******************
 
-    In the future stdcall will be replaced by cdecl. This will most likely
-    happen when Simba 1.0 is released.
+This is the first Simba plugin ABI. Any plugin that does not export
+`GetPluginABIVersion`_ is treated as this ABI.
 
-Functions that are to be imported by a script can currently use several calling
-convention, but we highly recommend using *stdcall* on x86 (until replaced with
-*cdecl*) and the native convention on x64.
+In this ABI `GetTypeInfo`_ passes the arguments as a native pascal **String**
+rather than a **PChar**. This is error prone; and versions > 0 use **PChar**.
 
-Exporting functions to scripts
-------------------------------
+The calling convention for all functions is expected to be **stdcall**.
 
-To let Simba know what functions you want to export to a script, your plugin
-needs to implement the following functions:
+Simba ABI Version 1
+*******************
 
-.. code-block:: pascal
+In this ABI `GetTypeInfo`_ passes the arguments as a  **PChar**.
 
-  GetFunctionCount: function: integer; stdcall;
-  GetFunctionInfo: function(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar): integer; stdcall;
-  GetFunctionCallingConv: function(x: integer): integer; stdcall;
+The calling convention for all functions (except `GetPluginABIVersion`_)
+is expected to be **stdcall**.
 
-The first function, *GetFunctionCount* returns how many functions are to be
-imported.
+Simba ABI Version 2
+*******************
 
-Simba will then call *GetFunctionInfo* and *GetFunctionCallingConv* **N**
-amount of times (where **N** is the result of *GetFunctionCount*) with
-*x* increased by one every time. Obviously, each function must be mapped
-to a specific value of *x*.
+The calling convention for all functions is expected to be **cdecl** on
+32 bit platforms; on platforms where **cdecl** does not exist, the native
+calling convention is expected.
 
-For *GetFunctionInfo*, the value of *ProcAddr* should be set to the address of
-the procedure to be called; and *ProcDef* should contain the definition (in
-Pascal types) of the function.
+Functions
+---------
 
-*GetFunctionCallingConv* returns the calling convention for the specific
-function. Currently, the only two support conventions are *stdcall* (0) and
-*register* (1).
+GetPluginABIVersion
+*******************
 
-Exporting types to scripts
---------------------------
+This function should return the ABI version of the plugin. The calling
+convention for this function is **always** **cdecl** on 32 bit and the native
+calling convention if **cdecl** does not exist.
 
-.. warning::
-    TODO
-
-Special Functions
------------------
+SetPluginMemManager
+*******************
 
 .. code-block:: pascal
 
-  OnAttach: procedure(info: Pointer); stdcall;
-
-This method is called when the plugin is loaded.
-Currently *info* will always be zero, but it might be used to pass information
-in the future.
-
-.. code-block:: pascal
-
-  OnDetach: procedure(); stdcall;
-
-This method is called just before the plugin is beeing freed.
-
-.. code-block:: pascal
-
-  SetPluginMemManager: procedure(MemMgr : TMemoryManager); stdcall;
+  procedure SetPluginMemManager(MemMgr : TMemoryManager);
 
 This function should be implemented when one is writing a plugin
 in Free Pascal.
@@ -97,26 +72,93 @@ the script in a safe manner. Doing so will require some hacks (it is possible),
 but might also lead to memory leaks if implemented wrong or used wrong in
 scripts.
 
+OnAttach
+********
+
+.. code-block:: pascal
+
+  procedure OnAttach(info: Pointer);
+
+This method is called when the plugin is loaded.
+Currently *info* will always be zero, but it might be used to pass information
+in the future.
+
+OnDetach
+********
+
+.. code-block:: pascal
+
+  procedure OnDetach();
+
+This method is called just before the plugin is beeing freed.
+*If you changed your memory manager to Simba's; you should now revert to your old
+one.*
+
+GetFunctionCount
+****************
+
+.. code-block:: pascal
+
+  function GetFunctionCount: integer;
+
+The first function, *GetFunctionCount* returns how many functions are to be
+imported.
+
+GetFunctionInfo
+***************
+
+.. code-block:: pascal
+
+  GetFunctionInfo: function(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar): integer; stdcall;
+
+Simba will then call *GetFunctionInfo* and *GetFunctionCallingConv* **N**
+amount of times (where **N** is the result of *GetFunctionCount*) with
+*x* increased by one every time. Obviously, each function must be mapped
+to a specific value of *x*.
+
+For *GetFunctionInfo*, the value of *ProcAddr* should be set to the address of
+the procedure to be called; and *ProcDef* should contain the definition (in
+Pascal types) of the function.
+
+
+GetFunctionCallingConv
+**********************
+
+.. warning::
+    This function is deprecated as of ABI >= 2
+
+.. code-block:: pascal
+
+  GetFunctionCallingConv: function(x: integer): integer; stdcall;
+
+*GetFunctionCallingConv* returns the calling convention for the specific
+function. Currently, the only two support conventions are *stdcall* (0) and
+*register* (1).
+
+GetTypeCount
+************
+
+GetTypeInfo
+***********
+
+Exporting functions to scripts
+------------------------------
+
+To let Simba know what functions you want to export to a script, your plugin
+needs to implement the following functions: `GetFunctionCount`_ and
+`GetFunctionInfo`_. Refer to their sections
+
+Exporting types to scripts
+--------------------------
+
+.. warning::
+    TODO
+
 TTarget_Exported
 ----------------
 
 .. warning::
     TODO
-
-
-Simba Plugin Functions
-----------------------
-
-.. code-block:: pascal
-
-  GetFunctionCount: function: integer; stdcall;
-  GetFunctionInfo: function(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar: integer; stdcall;
-  GetFunctionCallingConv: function(x: integer): integer; stdcall;
-  GetTypeCount: function: integer; stdcall;
-  GetTypeInfo: function(x: Integer; var sType, sTypeDef: string): integer; stdcall;
-  SetPluginMemManager: procedure(MemMgr : TMemoryManager); stdcall;
-  OnAttach: procedure(info: Pointer); stdcall;
-  OnDetach: procedure(); stdcall;
 
 Caveats
 -------

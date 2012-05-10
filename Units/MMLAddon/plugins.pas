@@ -23,15 +23,15 @@
 
 unit plugins;
 
-{
-   Problems with SMART; you cannot free the plugin when smart is open..
-   Therefore, loading & free-ing plugins per script run is not an option.
-   Assigning a TMPlugin per Tab might be a do-able solution, but will still cope with the SMART Problems..
-   So the question is: Plugins Per Tab,Per Run or Global?
 }
 {$mode objfpc}{$H+}
 
 interface
+
+{$define callconv:=
+    {$IFDEF WINDOWS}{$IFDEF CPU32}cdecl;{$ELSE}{$ENDIF}{$ENDIF}
+    {$IFDEF LINUX}{$IFDEF CPU32}cdecl;{$ELSE}{$ENDIF}{$ENDIF}
+}
 
 uses
   Classes, SysUtils, dynlibs, libloader;
@@ -84,16 +84,46 @@ var
   GetFuncCount: function: integer; stdcall;
   GetFuncInfo: function(x: Integer; var ProcAddr: Pointer; var ProcDef: PChar): integer; stdcall;
   GetFuncConv: function(x: integer): integer; stdcall;
+
   GetTypeCount: function: integer; stdcall;
-  GetTypeInfo: function(x: Integer; var sType, sTypeDef: string): integer; stdcall;
+
+  // ABI = 0
+  GetTypeInfo0: function(x: Integer; var sType, sTypeDef: string): integer; stdcall;
+
+  // ABI = 1
+  GetTypeInfo1: function(x: Integer; var sType, sTypeDef: PChar): integer; stdcall;
+
+  GetPluginABIVersion: Integer; callconv
+
   SetPluginMemManager: procedure(MemMgr : TMemoryManager); stdcall;
   OnAttach: procedure(info: Pointer); stdcall;
   PD: PChar;
   pntr: Pointer;
   ArrC, I: integer;
+
+  // Memory manager. We use this to retrieve our own memory manager and pass it
+  // to the plugin to simplify sharing of memory with FPC plugins.
   MemMgr : TMemoryManager;
+
+  // Plugin ABI version. Requires due to ABI changes and backwards
+  // compatibility.
+  PluginVersion: Integer;
+
+  // Strings for ABI = 0
+  a, b: String;
 begin
+  Result := False;
+
   SetLength(Plugins, NumPlugins + 1);
+
+  // Query ABI. Oldest is 0 (where GetPluginABIVersion is not exported)
+  Pointer(GetPluginABIVersion) := GetProcAddress(Plugin, PChar('GetPluginABIVersion');
+  if Assigned(GetPluginABIVersion) then
+    PluginVersion := GetPluginABIVersion();
+  else
+    PluginVersion := 0;
+
+  mDebugLn('Got plugin version: ', PluginVersion);
 
   Pointer(SetPluginMemManager) := GetProcAddress(Plugin, PChar('SetPluginMemManager'));
   if (Assigned(SetPluginMemManager)) then
@@ -108,28 +138,67 @@ begin
   begin
     OnAttach(nil);
   end;
-  
+
   Pointer(GetTypeCount) := GetProcAddress(Plugin, PChar('GetTypeCount'));
   if (Assigned(GetTypeCount)) then
   begin
-    Pointer(GetTypeInfo) := GetProcAddress(Plugin, PChar('GetTypeInfo'));
-    if (Assigned(GetTypeInfo)) then
-    begin
-      ArrC := GetTypeCount();
-
-      Plugins[NumPlugins].TypesLen := ArrC;
-      SetLength(Plugins[NumPlugins].Types, ArrC);
-
-      for I := 0 to ArrC - 1 do
-      begin
-        if (GetTypeInfo(I, Plugins[NumPlugins].Types[I].TypeName, Plugins[NumPlugins].Types[I].TypeDef) < 0) then
+    case PluginVersion of
+      0:
+        Pointer(GetTypeInfo0) := GetProcAddress(Plugin, PChar('GetTypeInfo'));
+        if (Assigned(GetTypeInfo0)) then
         begin
-          Plugins[NumPlugins].Types[I].TypeName := '';
-          Plugins[NumPlugins].Types[I].TypeDef := '';
+          ArrC := GetTypeCount();
+
+          Plugins[NumPlugins].TypesLen := ArrC;
+          SetLength(Plugins[NumPlugins].Types, ArrC);
+
+          for I := 0 to ArrC - 1 do
+          begin
+            if (GetTypeInfo0(I, a, b) >= 0) then
+            begin
+              Plugins[NumPlugins].Types[I].TypeName := Copy(a, 1, Length(a));
+              Plugins[NumPlugins].Types[I].TypeDef := Copy(b, 1, Length(b));
+            end
+            else
+            begin
+              Plugins[NumPlugins].Types[I].TypeName := '';
+              Plugins[NumPlugins].Types[I].TypeDef := '';
+            end;
+          end;
         end;
-      end;
+
+        end;
+      1:
+        Pointer(GetTypeInfo1) := GetProcAddress(Plugin, PChar('GetTypeInfo'));
+        if Assigned(GetTypeInfo1) then
+        begin
+          ArrC := GetTypeCount();
+
+          PD := StrAlloc(1024);
+          PD2 := StrAlloc(1024);
+
+          for I := 0 to ArrC - 1 do
+          begin
+            if (GetTypeInfo1(I, PD, PD2) >= 0) then
+            begin
+              Plugins[NumPlugins].Types[I].TypeName := PD;
+              Plugins[NumPlugins].Types[I].TypeDef := PD2;
+            end
+            else
+            begin
+              Plugins[NumPlugins].Types[I].TypeName := '';
+              Plugins[NumPlugins].Types[I].TypeDef := '';
+            end;
+          end;
+
+          StrDispose(PD);
+          StrDispose(PD2);
+        end;
+
+        end;
     end;
   end;
+
 
   Pointer(GetFuncCount) := GetProcAddress(Plugin, PChar('GetFunctionCount'));
   if (Assigned(GetFuncCount)) then
@@ -143,8 +212,8 @@ begin
       ArrC := GetFuncCount();
       Plugins[NumPlugins].MethodLen := ArrC;
       SetLength(Plugins[NumPlugins].Methods, ArrC);
-  
-      PD := StrAlloc(255);
+
+      PD := StrAlloc(1024);
       for I := 0 to ArrC - 1 do
       begin;
         if (GetFuncInfo(I, pntr, PD) < 0) then
