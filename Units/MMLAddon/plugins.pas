@@ -63,6 +63,7 @@ type
     TypesLen: integer;
     MemMgrSet: boolean;
     ABI: Integer;
+    Handle: TLibHandle;
   end;
   TMPluginArray = array of TMPlugin;
 
@@ -77,6 +78,8 @@ type
     public
       property MPlugins: TMPluginArray read Plugins;
       property Count: integer read NumPlugins;
+      procedure FreePlugins; override;
+      procedure FreePlugin(plugin: TMPlugin);
   end;
 
 implementation
@@ -102,7 +105,9 @@ var
   GetPluginABIVersion: function: Integer; {$callconv}
 
   SetPluginMemManager: procedure(MemMgr : TMemoryManager); stdcall;
-  OnAttach: procedure(info: Pointer); stdcall;
+
+  OnAttach: procedure(info: Pointer); {$callconv}
+
   PD, PD2: PChar;
   pntr: Pointer;
   ArrC, I: integer;
@@ -130,6 +135,7 @@ begin
     PluginVersion := 0;
 
   Plugins[NumPlugins].ABI := PluginVersion;
+  Plugins[NumPlugins].handle := Plugin;
 
   Pointer(SetPluginMemManager) := GetProcAddress(Plugin, PChar('SetPluginMemManager'));
   if (Assigned(SetPluginMemManager)) then
@@ -248,6 +254,53 @@ begin
 
   Inc(NumPlugins);
   Result := True;
+end;
+
+
+procedure TMPlugins.FreePlugins;
+var
+  I : integer;
+begin
+  for i := 0 to NumPlugins - 1 do
+  begin
+    writeln(format('Freeing plugin[%d]',[i]));
+    FreePlugin(Plugins[i]);
+  end;
+  SetLength(Plugins ,0);
+  numPlugins := 0;
+end;
+
+procedure TMPlugins.FreePlugin(plugin: TMPlugin);
+var
+    OnDetach_std: procedure(); stdcall;
+    OnDetach: procedure(); {$callconv}
+begin
+  if (plugin.handle > 0) then
+  try
+    if plugin.ABI < 2 then
+    begin
+      Pointer(OnDetach_std) := GetProcAddress(
+          plugin.handle, 'OnDetach');
+      if Assigned(OnDetach_std) then
+      begin
+        writeln('Calling OnDetach');
+        OnDetach_std();
+      end;
+    end else
+    begin
+      Pointer(OnDetach) := GetProcAddress(
+          plugin.handle, 'OnDetach');
+      if Assigned(OnDetach) then
+      begin
+        writeln('Calling OnDetach');
+        OnDetach();
+      end;
+    end;
+
+    FreeLibrary(plugin.handle);
+  except
+  end;
+
 end;
 
 end.
