@@ -74,6 +74,11 @@ the script in a safe manner. Doing so will require some hacks (it is possible),
 but might also lead to memory leaks if implemented wrong or used wrong in
 scripts.
 
+.. warning::
+    Simba does not guarantee that this function will be called only once; make
+    sure you don't overwrite your old memory manager when this function is
+    called twice.
+
 OnAttach
 ********
 
