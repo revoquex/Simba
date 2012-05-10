@@ -23,7 +23,6 @@
 
 unit plugins;
 
-}
 {$mode objfpc}{$H+}
 
 interface
@@ -37,14 +36,20 @@ uses
   Classes, SysUtils, dynlibs, libloader;
 
 const
-  cv_StdCall = 0; //StdCall
-  cv_Register = 1; //Register
-  
+  // stdcall
+  cv_StdCall = 0;
+
+  // register call
+  cv_Register = 1;
+
+  // default (cdecl where supported) otherwise native platform convention
+  cv_default = 2;
+
 type
   TPasScriptType = record
     TypeName, TypeDef: string;
   end;
-  
+
   TMPluginMethod = record
     FuncPtr: pointer;
     FuncStr: string;
@@ -57,6 +62,7 @@ type
     Types: array of TPasScriptType;
     TypesLen: integer;
     MemMgrSet: boolean;
+    ABI: Integer;
   end;
   TMPluginArray = array of TMPlugin;
 
@@ -93,11 +99,11 @@ var
   // ABI = 1
   GetTypeInfo1: function(x: Integer; var sType, sTypeDef: PChar): integer; stdcall;
 
-  GetPluginABIVersion: Integer; callconv
+  GetPluginABIVersion: function: Integer; {$callconv}
 
   SetPluginMemManager: procedure(MemMgr : TMemoryManager); stdcall;
   OnAttach: procedure(info: Pointer); stdcall;
-  PD: PChar;
+  PD, PD2: PChar;
   pntr: Pointer;
   ArrC, I: integer;
 
@@ -117,13 +123,13 @@ begin
   SetLength(Plugins, NumPlugins + 1);
 
   // Query ABI. Oldest is 0 (where GetPluginABIVersion is not exported)
-  Pointer(GetPluginABIVersion) := GetProcAddress(Plugin, PChar('GetPluginABIVersion');
+  Pointer(GetPluginABIVersion) := GetProcAddress(Plugin, PChar('GetPluginABIVersion'));
   if Assigned(GetPluginABIVersion) then
-    PluginVersion := GetPluginABIVersion();
+    PluginVersion := GetPluginABIVersion()
   else
     PluginVersion := 0;
 
-  mDebugLn('Got plugin version: ', PluginVersion);
+  Plugins[NumPlugins].ABI := PluginVersion;
 
   Pointer(SetPluginMemManager) := GetProcAddress(Plugin, PChar('SetPluginMemManager'));
   if (Assigned(SetPluginMemManager)) then
@@ -144,8 +150,9 @@ begin
   begin
     case PluginVersion of
       0:
+        begin
         Pointer(GetTypeInfo0) := GetProcAddress(Plugin, PChar('GetTypeInfo'));
-        if (Assigned(GetTypeInfo0)) then
+        if Assigned(GetTypeInfo0) then
         begin
           ArrC := GetTypeCount();
 
@@ -166,9 +173,9 @@ begin
             end;
           end;
         end;
-
         end;
       1:
+        begin
         Pointer(GetTypeInfo1) := GetProcAddress(Plugin, PChar('GetTypeInfo'));
         if Assigned(GetTypeInfo1) then
         begin
@@ -194,7 +201,6 @@ begin
           StrDispose(PD);
           StrDispose(PD2);
         end;
-
         end;
     end;
   end;
@@ -207,13 +213,16 @@ begin
 
     if (Assigned(GetFuncInfo)) then
     begin
-      Pointer(GetFuncConv) := GetProcAddress(Plugin, PChar('GetFunctionCallingConv'));
+      // GetFunctionCallingConv is deprecated with version >= 2
+      if PluginVersion < 2 then
+        Pointer(GetFuncConv) := GetProcAddress(Plugin, PChar('GetFunctionCallingConv'));
 
       ArrC := GetFuncCount();
       Plugins[NumPlugins].MethodLen := ArrC;
       SetLength(Plugins[NumPlugins].Methods, ArrC);
 
       PD := StrAlloc(1024);
+
       for I := 0 to ArrC - 1 do
       begin;
         if (GetFuncInfo(I, pntr, PD) < 0) then
@@ -221,10 +230,16 @@ begin
 
         Plugins[NumPlugins].Methods[I].FuncPtr := pntr;
         Plugins[NumPlugins].Methods[I].FuncStr := PD;
-        Plugins[NumPlugins].Methods[I].FuncConv := cv_stdcall;
+        if PluginVersion > 1 then
+          Plugins[NumPlugins].Methods[I].FuncConv := cv_default
+        else
+        begin
+          Plugins[NumPlugins].Methods[I].FuncConv := cv_stdcall;
 
-        if (Assigned(GetFuncConv)) then
-          Plugins[NumPlugins].Methods[I].FuncConv := GetFuncConv(I);
+          if (Assigned(GetFuncConv)) then
+            Plugins[NumPlugins].Methods[I].FuncConv := GetFuncConv(I);
+        end;
+
       end;
 
       StrDispose(PD);
