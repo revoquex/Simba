@@ -152,6 +152,7 @@ AddGlobalFunc('function DecRet(e: Extended): Extended', @Lape_DecRet);
 AddGlobalFunc('function log10(f: Extended): Extended', @Lape_log10);
 AddGlobalFunc('function MinA(a: TIntegerArray): Integer', @Lape_MinA);
 AddGlobalFunc('function MaxA(a: TIntegerArray): Integer', @Lape_MaxA);
+AddGlobalFunc('function Sum64IntArr(const Arr: TIntegerArray): Int64;', @Lape_Sum64IntArr);
 
 { Color }
 
@@ -341,8 +342,9 @@ AddGlobalFunc('procedure HakunaMatata;', @Lape_HakunaMatata);
 AddGlobalFunc('procedure Simba;', @Lape_Simba);
 AddGlobalFunc('procedure SetClipBoard(const Data: string);', @Lape_SetClipBoard);
 AddGlobalFunc('function GetClipBoard: string', @Lape_GetClipBoard);
-//AddGlobalFunc('function GetProcesses: TSysProcArr', @Lape_GetProcesses);
-//AddGlobalFunc('procedure SetTarget(Proc: TSysProc);', @Lape_SetTarget);
+AddGlobalFunc('function GetProcesses: TSysProcArr', @Lape_GetProcesses);
+AddGlobalFunc('function GetProcessID : LongInt', @Lape_GetProcessID);
+AddGlobalFunc('procedure SetTarget(Proc: TSysProc);', @Lape_SetTarget);
 AddGlobalFunc('function ExtractFileExt(const FileName: string): string', @Lape_ExtractFileExt);
 
 { Settings }

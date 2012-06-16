@@ -115,6 +115,7 @@ AddFunction(@ps_ArcSinh, 'function ArcSinh(e: extended): extended;');
 AddFunction(@DecRet, 'function DecRet(e: Extended): Extended;');
 AddFunction(@ps_MinA, 'function MinA(a: TIntegerArray): Integer;');
 AddFunction(@ps_MaxA, 'function MaxA(a: TIntegerArray): Integer;');
+AddFunction(@ps_Sum64IntArr, 'function Sum64IntArr(const Arr: TIntegerArray): Int64;');
 
 {$IFNDEF MML_EXPORT_THREADSAFE}
 {window}
@@ -206,6 +207,7 @@ AddFunction(@ps_MessageDlg,'function MessageDlg(const Caption, Msg: string; DlgT
 AddFunction(@ps_SetClipBoard, 'procedure SetClipBoard(const Data: string);');
 AddFunction(@ps_GetClipBoard, 'function GetClipBoard: string;');
 AddFunction(@ps_GetProcesses, 'function GetProcesses: TSysProcArr;');
+AddFunction(@ps_GetProcessID, 'function GetProcessID : LongInt;');
 AddFunction(@ps_SetTarget, 'procedure SetTarget(Proc: TSysProc);');
 {$ENDIF}
 

@@ -42,7 +42,7 @@ uses
   {$ENDIF}
   {$IFDEF USE_LAPE}
   , lpparser, lpcompiler, lptypes, lpvartypes,
-    lpeval, lpinterpreter
+    lpeval, lpinterpreter, lputils
   {$ENDIF};
 
 const
@@ -256,6 +256,9 @@ type
    public
      Parser: TLapeTokenizerString;
      Compiler: TLapeCompiler;
+     Running: TInitBool;
+     Wrappers: TList;
+
      constructor Create(CreateSuspended: Boolean; TheSyncInfo : PSyncInfo; plugin_dir: string);
      destructor Destroy; override;
      procedure SetScript(Script: string); override;
@@ -310,6 +313,7 @@ uses
   SynRegExpr,
   lclintf,  // for GetTickCount and others.
   Clipbrd,
+  lpffi, ffi, // For lape FFI
 
   DCPcrypt2,
   DCPrc2, DCPrc4, DCPrc5, DCPrc6,
@@ -492,25 +496,29 @@ var
 
 begin
   Result := False;
-  if CompareText(DirectiveName,'LOADLIB') = 0 then
+
+  if (CompareText(DirectiveName,'LOADLIB') = 0) then
   begin
-    if not active then
-      exit(true);
-    if DirectiveArgs <> '' then
-    begin;
-      plugin_idx:= PluginsGlob.LoadPlugin(DirectiveArgs);
-      if plugin_idx < 0 then
-        psWriteln(Format('Your DLL %s has not been found',[DirectiveArgs]))
-      else
+    if (not (Active)) then
+      Exit(True);
+
+    if (DirectiveArgs <> '') then
+    begin
+      plugin_idx := PluginsGlob.LoadPlugin(DirectiveArgs);
+
+      if (plugin_idx >= 0) then
       begin
         LoadPlugin(plugin_idx);
-        Result:= True;
-      end;
-    end
-    else
+
+        if (not (PluginsGlob.MPlugins[plugin_idx].MemMgrSet)) then
+          mDebugLn(Format('The DLL "%s" doesn''t set a memory manager.', [DirectiveArgs]));
+
+        Result := True;
+      end else
+        psWriteln(Format('Your DLL %s has not been found.', [DirectiveArgs]))
+    end else
       psWriteln('Your LoadLib directive has no params, thus cannot find the plugin');
-  end
-  else if CompareText(DirectiveName,'WARNING') = 0 then
+  end else if CompareText(DirectiveName,'WARNING') = 0 then
   begin
     if not active then
       exit(true);
@@ -734,6 +742,13 @@ begin
   case conv of
     cv_StdCall : result := cdStdCall;
     cv_Register: result := cdRegister;
+
+    cv_Default: result :=
+    {$IFDEF CPU32}
+    cdCdecl;
+    {$ELSE}
+    cdCdecl; // this shouldn't matter at all
+    {$ENDIF}
   else
     raise exception.createfmt('Unknown Calling Convention[%d]',[conv]);
   end;
@@ -864,15 +879,16 @@ end;
 procedure TPSThread.OnCompImport(Sender: TObject; x: TPSPascalCompiler);
 begin
   SIRegister_Std(x);
+  SIRegister_Classes(x, True);
   SIRegister_Controls(x);
-  SIRegister_Classes(x, true);
-  SIRegister_Graphics(x, true);
-  SIRegister_stdctrls(x);
+  SIRegister_Graphics(x, True);
   SIRegister_Forms(x);
+  SIRegister_stdctrls(x);
   SIRegister_ExtCtrls(x);
   SIRegister_Menus(x);
   SIRegister_ComCtrls(x);
   SIRegister_Dialogs(x);
+  
   if self.settings <> nil then
   begin
     if lowercase(self.settings.GetKeyValueDefLoad(ssInterpreterAllowSysCalls,
@@ -967,8 +983,8 @@ begin
   RIRegister_Classes(x, True);
   RIRegister_Controls(x);
   RIRegister_Graphics(x, True);
-  RIRegister_stdctrls(x);
   RIRegister_Forms(x);
+  RIRegister_stdctrls(x);
   RIRegister_ExtCtrls(x);
   RIRegister_Menus(x);
   RIRegister_Mufasa(x);
@@ -1317,22 +1333,22 @@ type
   PMDTM = ^TMDTM;
   PMDTMPoint = ^TMDTMPoint;
   PSDTM = ^TSDTM;
-  
+
 threadvar
   WriteLnStr: string;
-  
-procedure lp_Write(Params: PParamArray);
+
+procedure lp_Write(Params: PParamArray); lape_extdecl
 begin
   WriteLnStr += PlpString(Params^[0])^;
 end;
-  
-procedure lp_WriteLn(Params: PParamArray);
+
+procedure lp_WriteLn(Params: PParamArray); lape_extdecl
 begin
   psWriteLn(WriteLnStr);
   WriteLnStr := '';
 end;
 
-procedure lp_DebugLn(Params: PParamArray);
+procedure lp_DebugLn(Params: PParamArray); lape_extdecl
 begin
   ps_debugln(PlpString(Params^[0])^);
 end;
@@ -1365,8 +1381,11 @@ begin
 
   Parser := TLapeTokenizerString.Create('');
   Compiler := TLapeCompiler.Create(Parser);
+  Running := bFalse;
 
   InitializePascalScriptBasics(Compiler);
+  ExposeGlobals(Compiler);
+
   Compiler['Move'].Name := 'MemMove';
   Compiler.OnFindFile := @OnFindFile;
   Compiler.OnHandleDirective := @OnHandleDirective;
@@ -1391,11 +1410,23 @@ begin
 
     EndImporting;
   end;
+
+  Wrappers := TList.Create;
 end;
 
 destructor TLPThread.Destroy;
 begin
   try
+    if Assigned(Wrappers) then
+    begin
+      while Wrappers.Count <> 0 Do
+      begin
+        TImportClosure(Wrappers.First).Free;
+        Wrappers.Delete(0)
+      end;
+      Wrappers.Free;
+    end;
+
     if (Assigned(Compiler)) then
       Compiler.Free
     else if (Assigned(Parser)) then
@@ -1459,9 +1490,22 @@ end;
 procedure TLPThread.LoadPlugin(plugidx: integer);
 var
   I: integer;
+  Wrapper: TImportClosure;
 begin
   with PluginsGlob.MPlugins[plugidx] do
   begin
+    {$IFDEF CPU32}
+    if ABI < 2 then
+    begin
+      psWriteln('Skipping plugin due to ABI <= 2');
+      exit; // Can't set result?
+    end;
+    {$ENDIF}
+    if not FFILoaded() then
+    begin
+      writeln('Not loading plugin for lape - libffi not found');
+      raise EAssertionFailed.Create('libffi is not loaded');
+    end;
     Compiler.StartImporting;
 
     for i := 0 to TypesLen -1 do
@@ -1469,8 +1513,11 @@ begin
         Compiler.addGlobalType(TypeDef, TypeName);
 
     for i := 0 to MethodLen - 1 do
-      with Methods[i] do
-        Compiler.addGlobalFunc(FuncStr, FuncPtr);
+    begin
+      Wrapper := LapeImportWrapper(Methods[i].FuncPtr, Compiler, Methods[i].FuncStr);
+      Compiler.addGlobalFunc(Methods[i].FuncStr, Wrapper.func);
+      Wrappers.Add(Wrapper);
+    end;
 
     Compiler.EndImporting;
   end;
@@ -1489,7 +1536,8 @@ begin
       if CompileOnly then
         Exit;
 
-      RunCode(Compiler.Emitter.Code);
+      Running := bTrue;
+      RunCode(Compiler.Emitter.Code, Running);
 
       psWriteln('Successfully executed.');
     end else
@@ -1502,7 +1550,7 @@ end;
 
 procedure TLPThread.Terminate;
 begin
-  psWriteLn('Lape doesn''t support stoping scripts yet... Please hit stop again to terminate!');
+  Running := bFalse;
 end;
 {$ENDIF}
 
