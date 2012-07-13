@@ -60,7 +60,9 @@ uses
   PSDump,
 
   updater,
-  newsimbasettings;
+  scriptmanager,
+  newsimbasettings
+  {$IFDEF USE_DEBUGGER}, debugger{$ENDIF};
 
 const
   interp_PS = 0; //PascalScript
@@ -103,6 +105,7 @@ type
   { TSimbaForm }
 
   TSimbaForm = class(TForm)
+    ActionDebugger: TAction;
     ActionLape: TAction;
     ActionGoto: TAction;
     ActionCPascal: TAction;
@@ -178,6 +181,9 @@ type
     NewsTimer: TTimer;
     FunctionListTimer: TTimer;
     SCARHighlighter: TSynPasSyn;
+    ToolButton5: TToolButton;
+    TT_ScriptManager: TToolButton;
+    ToolButton6: TToolButton;
     TT_Console: TToolButton;
     TT_Cut: TToolButton;
     TT_Copy: TToolButton;
@@ -284,6 +290,7 @@ type
     procedure ActionCopyExecute(Sender: TObject);
     procedure ActionCPascalExecute(Sender: TObject);
     procedure ActionCutExecute(Sender: TObject);
+    procedure ActionDebuggerExecute(Sender: TObject);
     procedure ActionDeleteExecute(Sender: TObject);
     procedure ActionExitExecute(Sender: TObject);
     procedure ActionExtensionsExecute(Sender: TObject);
@@ -400,6 +407,7 @@ type
       var Continue: boolean);
     procedure ScriptStartEvent(Sender: TObject; var Script : string; var Continue : boolean);
     procedure ScriptOpenEvent(Sender: TObject; var Script : string);
+    procedure TT_ScriptManagerClick(Sender: TObject);
     procedure TrayPopupPopup(Sender: TObject);
     procedure TT_UpdateClick(Sender: TObject);
     procedure UpdateMenuButtonClick(Sender: TObject);
@@ -1395,7 +1403,7 @@ begin
           mDebugLn('Terminating the Scriptthread');
           mDebugLn('Exit code terminate: ' +inttostr(KillThread(ScriptThread.Handle)));
           WaitForThreadTerminate(ScriptThread.Handle, 0);
-          ScriptThread.Free;
+          FreeAndNil(ScriptThread);
           ScriptState := ss_None;
         end;
       ss_Running:
@@ -1873,6 +1881,7 @@ var
   Script: string;
   loadFontsOnScriptStart: boolean;
   Continue: boolean;
+  H, I: LongInt;
 begin
   if (CurrScript.ScriptFile <> '') and CurrScript.GetReadOnly() then
   begin
@@ -1961,9 +1970,9 @@ begin
   }
   Thread.SetSettings(SimbaSettings.MMLSettings, SimbaSettingsFile);
 
-  Thread.OpenConnectionEvent:=@ThreadOpenConnectionEvent;
-  Thread.WriteFileEvent:=@ThreadWriteFileEvent;
-  Thread.OpenFileEvent:=@ThreadOpenFileEvent;
+  Thread.OpenConnectionEvent := @ThreadOpenConnectionEvent;
+  Thread.WriteFileEvent := @ThreadWriteFileEvent;
+  Thread.OpenFileEvent := @ThreadOpenFileEvent;
 end;
 
 procedure TSimbaForm.HandleConfigParameter;
@@ -2125,6 +2134,15 @@ begin
     CurrScript.SynEdit.CutToClipboard
   else if Memo1.Focused then
     Memo1.CutToClipboard;
+end;
+
+procedure TSimbaForm.ActionDebuggerExecute(Sender: TObject);
+begin
+  {$IFDEF USE_DEBUGGER}
+  DebuggerForm.DebugThread := CurrScript.ScriptThread;
+  DebuggerForm.Show;
+  DebuggerForm.UpdateInfo();
+  {$ENDIF}
 end;
 
 procedure TSimbaForm.ActionDeleteExecute(Sender: TObject);
@@ -2674,33 +2692,29 @@ begin
     end;
   end;
 
-  InitializeTMThread(TMThread(Thread));
-  if (not Assigned(Thread)) then
-    Exit;
-
+  ValueDefs := TStringList.Create;
   try
-    ValueDefs := TStringList.Create;
+    InitializeTMThread(Thread);
+
+    if (not ((Assigned(Thread)) and (Thread is TPSThread))) then
+      Exit;
+
+    with Thread do
     try
-      with TPSScriptExtension.Create(SimbaForm) do
-      try
-        UsePreProcessor := True;
-        OnCompile := Thread.PSScript.OnCompile;
-        OnCompImport := Thread.PSScript.OnCompImport;
-        OnExecImport := Thread.PSScript.OnExecImport;
-        Defines.Assign(Thread.PSScript.Defines);
-
-        GetValueDefs(ValueDefs);
-        CoreDefines.AddStrings(Defines);
-      finally
-        Free;
-      end;
-
-      Stream := TMemoryStream.Create;
-      ValueDefs.SaveToStream(Stream);
+      PSScript.GetValueDefs(ValueDefs);
+      CoreDefines.AddStrings(PSScript.Defines);
     finally
-      ValueDefs.Free;
+      Free;
     end;
 
+    Stream := TMemoryStream.Create;
+    ValueDefs.SaveToStream(Stream);
+  finally
+    ValueDefs.Free;
+  end;
+
+  if (Assigned(Stream)) then
+  begin
     Buffer := TCodeInsight.Create;
     with Buffer do
     try
@@ -2712,9 +2726,8 @@ begin
     end;
     SetLength(CoreBuffer, 1);
     CoreBuffer[0] := Buffer;
-  finally
-    if (Assigned(Thread)) then
-      Thread.Free;
+
+    Stream.Free;
   end;
 end;
 
@@ -2787,7 +2800,7 @@ begin
 
   InitmDebug; { Perhaps we need to place this before our mDebugLines?? }
 
-  Self.OnScriptStart:= @ScriptStartEvent;
+  Self.OnScriptStart := @ScriptStartEvent;
   Self.onScriptOpen := @ScriptOpenEvent;
 
   FillThread := TProcThread.Create;
@@ -2797,6 +2810,10 @@ begin
 
   Application.CreateForm(TSimbaUpdateForm, SimbaUpdateForm);
   {$IFDEF USE_EXTENSIONS}Application.CreateForm(TExtensionsForm, ExtensionsForm);{$ENDIF}
+  {$IFDEF USE_DEBUGGER}
+  Application.CreateForm(TDebuggerForm, DebuggerForm);
+  ActionDebugger.Visible := True;
+  {$ENDIF}
 
   HandleConfigParameter;
   if FileExistsUTF8(SimbaSettingsFile) then
@@ -3397,6 +3414,11 @@ begin
                          TB_Stop.ImageIndex := Image_Stop; TB_Stop.Enabled:= True;
                          TrayPlay.Checked := True; TrayPlay.Enabled := False; {$ifdef MSWindows}TrayPause.Checked := false; TrayPause.Enabled := True;{$endif}
                          TrayStop.Enabled:= True; TrayStop.Checked:= False;
+
+                         {$IFDEF USE_DEBUGGER}
+                         if (SimbaSettings.Interpreter._Type.Value = interp_PS) then
+                           ActionDebugger.Enabled := True;
+                         {$ENDIF}
                    end;
       ss_Paused  : begin Text := 'Paused'; TB_Run.Enabled:= True; {$ifdef MSWindows}TB_Pause.Enabled:= True; {$endif}
                          TB_Stop.ImageIndex := Image_Stop; TB_Stop.Enabled:= True;
@@ -3407,11 +3429,21 @@ begin
                          TB_Stop.ImageIndex := Image_Terminate;
                          TrayPlay.Checked := False; TrayPlay.Enabled := False; {$ifdef MSWindows}TrayPause.Checked := false; TrayPause.Enabled := False;{$endif}
                          TrayStop.Enabled:= True; TrayStop.Checked:= True;
+
                    end;
       ss_None    : begin Text := 'Done'; TB_Run.Enabled:= True; TB_Pause.Enabled:= False; TB_Stop.Enabled:= False;
                          TB_Stop.ImageIndex := Image_Stop;
                          TrayPlay.Checked := false; TrayPlay.Enabled := True; {$ifdef MSWindows}TrayPause.Checked := false; TrayPause.Enabled := False;{$endif}
                          TrayStop.Enabled:= false; TrayStop.Checked:= False;
+
+                         {$IFDEF USE_DEBUGGER}
+                         if (SimbaSettings.Interpreter._Type.Value = interp_PS) then
+                         begin
+                           ActionDebugger.Enabled := False;
+                           if  (DebuggerForm.Showing) then
+                             DebuggerForm.Hide;
+                         end;
+                         {$ENDIF}
                    end;
     end;
 end;
@@ -3466,7 +3498,7 @@ begin
   SimbaSettings.Fonts.Path.onChange:= @SetFontsPath;
   SimbaSettings.Includes.Path.onChange:= @SetIncludesPath;
   SimbaSettings.Scripts.Path.onChange:= @SetScriptsPath;
-  {$IFDEF USE_EXTENSIONS}SimbaSettings.Extensions.Path.onChange:= @SetExtensionsPath;{$ENDIF}
+  {$IFDEF USE_EXTENSIONS}SimbaSettings.Extensions.Path.onChange := @SetExtensionsPath;{$ENDIF}
 
   SimbaSettings.SourceEditor.DefScriptPath.onChange := @SetDefaultScriptPath;
 end;
@@ -3561,6 +3593,11 @@ begin
   ScriptOpenData.Sender:=Sender;
   ScriptOpenData.Script:= @Script;
   TThread.Synchronize(nil,@HandleScriptOpenData);
+end;
+
+procedure TSimbaForm.TT_ScriptManagerClick(Sender: TObject);
+begin
+  ScriptManagerForm.ShowModal;
 end;
 
 procedure TSimbaForm.SetShowParamHintAuto(const AValue: boolean);

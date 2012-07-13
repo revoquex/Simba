@@ -32,9 +32,9 @@ unit mmlpsthread;
 interface
 
 uses
-  Classes, SysUtils, client, uPSComponent,uPSCompiler,
+  Classes, SysUtils, client, uPSComponent, uPSCompiler, PSDump,
   uPSRuntime, uPSPreProcessor, MufasaTypes, MufasaBase, web, fontloader,
-  bitmaps, plugins, dynlibs, internets, scriptproperties,
+  bitmaps, plugins, dynlibs, internets,scriptproperties,
   settings, settingssandbox, lcltype, dialogs
   {$IFDEF USE_SQLITE}, msqlite3{$ENDIF}
   {$IFDEF USE_RUTIS}
@@ -205,7 +205,7 @@ type
         procedure OutputMessages;
         procedure HandleScriptTerminates;
       public
-        PSScript : TPSScript;
+        PSScript: TPSScriptExtension;
         constructor Create(CreateSuspended: Boolean; TheSyncInfo : PSyncInfo; plugin_dir: string);
         destructor Destroy; override;
         procedure SetScript(script: string); override;
@@ -288,7 +288,8 @@ var
 implementation
 
 uses
-  colour_conv,dtmutil,
+  SimbaUnit,
+  colour_conv, dtmutil,
   {$ifdef mswindows}windows,  MMSystem,{$endif}//MMSystem -> Sounds
   uPSC_std, uPSC_controls,uPSC_classes,uPSC_graphics,uPSC_stdctrls,uPSC_forms, uPSC_menus,
   uPSC_extctrls, uPSC_mml, uPSC_dll, //Compile-libs
@@ -297,6 +298,7 @@ uses
   IniFiles,//Silly INI files
   stringutil, //String st00f
   newsimbasettings, // SimbaSettings
+  {$IFDEF USE_DEBUGGER}debugger,{$ENDIF}
 
   uPSR_std, uPSR_controls,uPSR_classes,uPSR_graphics,uPSR_stdctrls,uPSR_forms, uPSR_mml,
   uPSR_menus, uPSI_ComCtrls, uPSI_Dialogs, uPSR_dll,
@@ -533,11 +535,11 @@ begin
       Result := True;
       if FileName = '' then
         psWriteln(format('Warning: In %s: at row: %d, col: %d, pos %d: %s',
-                               ['Main script', Parser.row, Parser.col,
+                               ['Main script', Parser.row - 1, Parser.col,
                                Parser.pos, DirectiveArgs]))
       else
         psWriteln(format('Warning: In file %s: at row: %d, col: %d, pos %d: %s',
-                             [FileName, Parser.row, Parser.col,
+                             [FileName, Parser.row - 1, Parser.col,
                              Parser.pos, DirectiveArgs]));
       //HandleError(Parser.Row + 1, Parser.Col, Parser.Pos, 'Warning at ' + DirectiveArgs, errCompile, FileName);
     end;
@@ -562,7 +564,7 @@ begin
         psWriteln(format('Error: In file %s: at row: %d, col: %d, pos %d: %s',
                              [FileName, Parser.row, Parser.col,
                              Parser.pos, DirectiveArgs])); }
-      HandleError(Parser.Row + 1, Parser.Col, Parser.Pos, 'Error: ' + DirectiveArgs, errCompile, FileName);
+      HandleError(Parser.Row - 1, Parser.Col, Parser.Pos, 'Error: ' + DirectiveArgs, errCompile, FileName);
       raise EPSPreProcessor.Create('ERROR directive found');
     end;
   end else
@@ -596,15 +598,15 @@ begin
     Client.MOCR.Fonts := Fonts;
 end;
 
-function ThreadSafeCall(ProcName: string; var V: TVariantArray): Variant; extdecl;
+function ThreadSafeCall(aProcName: string; var V: TVariantArray): Variant; extdecl;
 begin
   if GetCurrentThreadId = MainThreadID then
   begin
     with TPSThread(currthread).PSScript do
-      Result := Exec.RunProcPVar(V,Exec.GetProc(Procname));
+      Result := Exec.RunProcPVar(V,Exec.GetProc(aProcName));
   end else
   begin
-    CurrThread.SyncInfo^.MethodName:= ProcName;
+    CurrThread.SyncInfo^.MethodName:= aProcName;
     CurrThread.SyncInfo^.V:= @V;
     CurrThread.SyncInfo^.OldThread := CurrThread;
     CurrThread.SyncInfo^.Res := @Result;
@@ -612,10 +614,10 @@ begin
   end;
 end;
 
-function CallProc(ProcName: string; var V: TVariantArray): Variant; extdecl;
+function CallProc(aProcName: string; var V: TVariantArray): Variant; extdecl;
 begin
   with TPSThread(currthread).PSScript do
-    Result := Exec.RunProcPVar(V,Exec.GetProc(Procname));
+    Result := Exec.RunProcPVar(V,Exec.GetProc(aProcName));
 end;
 
 {$I PSInc/Wrappers/other.inc}
@@ -673,21 +675,28 @@ end;
 
 constructor TPSThread.Create(CreateSuspended : boolean; TheSyncInfo : PSyncInfo; plugin_dir: string);
 var
-  I : integer;
+  I, H: LongInt;
 begin
   inherited Create(CreateSuspended, TheSyncInfo, plugin_dir);
-  PSScript := TPSScript.Create(nil);
-  PSScript.UsePreProcessor:= True;
+  PSScript := TPSScriptExtension.Create(nil);
+  PSScript.UsePreProcessor := True;
+  PSScript.UseDebugInfo := True;
   PSScript.CompilerOptions := PSScript.CompilerOptions + [icBooleanShortCircuit];
   PSScript.OnNeedFile := @RequireFile;
   PSScript.OnIncludingFile := @OnIncludingFile;
   PSScript.OnFileAlreadyIncluded := @FileAlreadyIncluded;
-  PSScript.OnProcessDirective:=@OnProcessDirective;
-  PSScript.OnProcessUnknowDirective:=@PSScriptProcessUnknownDirective;
-  PSScript.OnCompile:= @OnCompile;
-  PSScript.OnCompImport:= @OnCompImport;
-  PSScript.OnExecImport:= @OnExecImport;
-  PSScript.OnFindUnknownFile:= @PSScriptFindUnknownFile;
+  PSScript.OnProcessDirective := @OnProcessDirective;
+  PSScript.OnProcessUnknowDirective := @PSScriptProcessUnknownDirective;
+  PSScript.OnCompile := @OnCompile;
+  PSScript.OnCompImport := @OnCompImport;
+  PSScript.OnExecImport := @OnExecImport;
+  PSScript.OnFindUnknownFile := @PSScriptFindUnknownFile;
+
+  {$IFDEF USE_DEBUGGER}
+  DebuggerForm.DebugThread := Self;
+  if (SimbaForm.CurrScript.SynEdit.Marks.Count > 0) then
+    TThread.Synchronize(nil, @DebuggerForm.ShowForm);
+  {$ENDIF}
 
   with PSScript do
   begin
@@ -695,11 +704,12 @@ begin
     {$I PSInc/psdefines.inc}
   end;
 
-  for i := 0 to high(ExportedMethods) do
-    if pos('Writeln',exportedmethods[i].FuncDecl) > 0 then
+  H := High(ExportedMethods);
+  for I := 0 to H do
+    if (Pos('Writeln', ExportedMethods[i].FuncDecl) > 0) then
     begin
       ExportedMethods[i].FuncPtr := nil;
-      break;
+      Break;
     end;
 end;
 
@@ -1009,7 +1019,7 @@ begin
       b := True;
       if OnError <> nil then
         with PSScript.CompilerMessages[l] do
-          HandleError(Row, Col, Pos, MessageToString,errCompile, ModuleName)
+          HandleError(Row + 1, Col, Pos, MessageToString,errCompile, ModuleName)
       else
         psWriteln(PSScript.CompilerErrorToStr(l) + ' at line ' + inttostr(PSScript.CompilerMessages[l].Row - 1));
     end else
@@ -1072,7 +1082,7 @@ end;
 
 procedure TPSThread.SetScript(script: string);
 begin
-   PSScript.Script.Text:= LineEnding+Script; //A LineEnding to create space for future extra's in first line (defines?)
+   PSScript.Script.Text := LineEnding + Script; //A LineEnding to conform with the info we add to includes
 end;
 
 {***implementation TCPThread***}

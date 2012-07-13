@@ -728,11 +728,13 @@ begin
   Fonts.UpdateLink := Fonts.AddChild(TStringSetting.Create(ssFontsLink)) as TStringSetting;
   Fonts.UpdateLink.onDefault := @GetFontsUpdateLink;
 
+  {$IFDEF USE_EXTENSIONS}
   Extensions := AddChild(TExtensionsSection.Create()) as TExtensionsSection;
   Extensions.Path := Extensions.AddChild(TPathSetting.Create(ssExtensionsPath)) as TPathSetting;
   {$IFDEF USE_EXTENSIONS}Extensions.Path.onDefault := @GetExtPath;{$ENDIF}
   Extensions.FileExtension := Extensions.AddChild(TStringSetting.Create(ssExtensionsFileExtension)) as TStringSetting;
   Extensions.FileExtension.onDefault := @GetExtensionsFileExtension;
+  {$ENDIF}
 
   Scripts := AddChild(TScriptsSection.Create()) as TScriptsSection;
   Scripts.Path := Scripts.AddChild(TPathSetting.Create(ssScriptsPath)) as TPathSetting;
