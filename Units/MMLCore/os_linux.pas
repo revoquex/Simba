@@ -283,6 +283,7 @@ implementation
     begin
       w := ax2 - ax1;
       h := ay2 - ay1;
+      exit;
     end;
     if XGetWindowAttributes(display, window, @Attrib) <> 0 Then
     begin
