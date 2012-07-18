@@ -297,7 +297,10 @@ interface
 
         function IsFrozen: boolean;
         procedure SetFrozen(makefrozen: boolean);
-        
+
+        function SetClientArea(x1, y1, x2, y2: integer): boolean;
+        procedure ResetClientArea;
+
         procedure GetMousePos(var X, Y: Integer);
         procedure MoveMouse(X, Y: Integer);
         procedure ScrollMouse(x,y : integer; Lines : integer);
@@ -639,6 +642,18 @@ procedure TIOManager_Abstract.ActivateClient;
 begin 
   keymouse.ActivateClient(); 
   {not sure if image needs activation or not, if its a native window keymouse == image so it should be good.}
+end;
+
+function TIOManager_Abstract.SetClientArea(x1, y1, x2, y2: integer): boolean;
+begin
+  Result := image.SetClientArea(x1, y1, x2, y2);
+  if Result then
+    Result := keymouse.SetClientArea(x1, y1, x2, y2);
+end;
+procedure TIOManager_Abstract.ResetClientArea;
+begin
+  image.ResetClientArea;
+  keymouse.ResetClientArea;
 end;
 
 procedure TIOManager_Abstract.GetMousePos(var X, Y: Integer);
