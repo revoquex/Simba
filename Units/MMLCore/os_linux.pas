@@ -102,6 +102,8 @@ interface
         { (Forced) Client Area }
         ax1, ay1, ax2, ay2: integer;
         caset: Boolean;
+
+        procedure ApplyAreaOffset(var x, y: integer);
     end;
 
     TIOManager = class(TIOManager_Abstract)
@@ -350,6 +352,15 @@ implementation
     caset := False;
   end;
 
+  procedure TWindow.ApplyAreaOffset(var x, y: integer);
+  begin
+    if caset then
+    begin
+      x := x + ax1;
+      y := y + ay1;
+    end;
+  end;
+
   procedure TWindow.ActivateClient;
 
   begin
@@ -371,11 +382,7 @@ implementation
                                 ' the previously used data. Do not forget to'+
                                 ' call FreeReturnData', []);
 
-    if caset then
-    begin
-      xs := ax1;
-      ys := ay1;
-    end;
+    ApplyAreaOffset(xs, ys);
 
     buffer := XGetImage(display, window, xs, ys, width, height, AllPlanes, ZPixmap);
     if buffer = nil then
@@ -421,20 +428,12 @@ implementation
     x := event.x;
     y := event.y;
 
-    if caset then
-    begin
-      x := x + ax1;
-      y := y + ay1;
-    end;
+    ApplyAreaOffset(x, y);
   end;
 
   procedure TWindow.MoveMouse(x,y: integer);
   begin
-    if caset then
-    begin
-      x := x + ax1;
-      y := y + ay1;
-    end;
+    ApplyAreaOffset(x, y);
     XWarpPointer(display, None, window, 0, 0, 0, 0, X, Y);
     XFlush(display);
   end;
