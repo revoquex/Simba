@@ -2674,18 +2674,13 @@ begin
 end;
 
 function colbok(v: TLapeGlobalVar; AName: lpString; Compiler: TLapeCompiler): lpString;
-var hack: string;
+var
+    hack: string;
+    i: integer;
+    m: TLapeType_Method;
+    p: TLapeParameterList;
 begin
   Result := '';
-  case v.BaseType of
-    ltUInt8, ltInt8, ltUInt16, ltInt16, ltUInt32, ltInt32, ltUInt64, ltInt64,
-    ltSingle, ltDouble, ltCurrency, ltExtended,
-    ltBoolean, ltByteBool, ltWordBool, ltLongBool,
-    ltAnsiChar, ltWideChar,
-    ltShortString, ltUnicodeString:
-      ;
-    //Result := 'const ' + v.Name + ' = ' + v.AsString + ';';
-  end; // end case
 
   if v.VarType is TLapeType_Pointer then
   begin
@@ -2706,6 +2701,40 @@ begin
   end else if v.VarType is TLapeType_Method then
   begin
     writeln('TLapeType_Method: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+
+    m := TLapeType_Method(v.VarType);
+    p := m.Params;
+
+    if (m.Res <> nil) then
+    begin
+      if m.Res is TLapeType_Type then
+        exit('');
+      result := 'function ';
+    end else
+      result := 'procedure ';
+
+    result := result + AName + '(';
+
+    for i := 0 to p.Count -1 do
+    begin
+      if p.Items[i].VarType is TLapeType_Type then
+      begin
+        writeln('Skipping - not base: ' + p.Items[i].VarType.AsString);
+        exit('');
+      end;
+      if (i = p.Count -1) then
+        result := result + 'Variable'+IntToStr(i) + ': ' + p.Items[i].VarType.AsString
+      else
+        result := result + 'Variable'+IntToStr(i) + ': ' + p.Items[i].VarType.AsString + ';';
+      writeln('Param: ' + inttostr(i) + ': ' + p.Items[i].VarType.AsString);
+    end;
+
+    result := result + ')';
+
+    if (m.Res <> nil) then
+      result := result + ': ' + m.Res.AsString;
+
+    result := result + ';';
   end else if v.VarType is TLapeType_MethodOfType then
   begin
     writeln('TLapeType_MethodOfType: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
