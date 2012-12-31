@@ -2674,10 +2674,65 @@ begin
 end;
 
 function colbok(v: TLapeGlobalVar; AName: lpString; Compiler: TLapeCompiler): lpString;
+var hack: string;
 begin
-  result := v.Name + ': ' + v.VarType.AsString + '=' + v.AsString;
-  writeln(Result);
-  //CoreDefines.AddString(Result);
+  Result := '';
+  case v.BaseType of
+    ltUInt8, ltInt8, ltUInt16, ltInt16, ltUInt32, ltInt32, ltUInt64, ltInt64,
+    ltSingle, ltDouble, ltCurrency, ltExtended,
+    ltBoolean, ltByteBool, ltWordBool, ltLongBool,
+    ltAnsiChar, ltWideChar,
+    ltShortString, ltUnicodeString:
+      ;
+    //Result := 'const ' + v.Name + ' = ' + v.AsString + ';';
+  end; // end case
+
+  if v.VarType is TLapeType_Pointer then
+  begin
+    if v.BaseType in LapeStringTypes then
+    begin
+      hack :=  v.AsString;
+      hack[1] := '''';
+      hack[length(hack)] := '''';
+      result := 'const ' + AName + ' = ' + hack + ';';
+    end else
+      writeln('TLapeType_Pointer: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_Type then
+  begin
+    writeln('TLapeType_Type: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_TypeEnum then
+  begin
+    writeln('TLapeType_TypeEnum: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_Method then
+  begin
+    writeln('TLapeType_Method: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_MethodOfType then
+  begin
+    writeln('TLapeType_MethodOfType: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_MethodOfObject then
+  begin
+    writeln('TLapeType_MethodOfObject: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_Property then
+  begin
+    writeln('TLapeType_Property: ' + v.Name + ' : ' + v.VarType.AsString + '(AName = ' + AName + ')');
+  end else if v.VarType is TLapeType_Label then
+  begin
+  end else
+  begin
+    result := 'const ' + AName + ' = ' + v.AsString + ';';
+    //writeln('Base: ' + v.Name + ': ' + v.VarType.AsString + ' = ' + v.AsString + '(AName = ' + AName + ')');
+  end;
+
+  // variant
+  // pointer
+  // enum, typeenum, type
+  // basetypes: int, str, whatever
+  // method / methodofobject / methodoftype
+
+  if Result <> '' then
+  begin
+    writeln('ADDED: ' + Result);
+  end;
 end;
 
 procedure TSimbaForm.CCFillCore;
@@ -2689,9 +2744,6 @@ var
   interpreter: integer;
 
 begin
-    // function TraverseGlobals(Compiler: TLapeCompiler; Callback: TTraverseCallback;
-    // BaseName: lpString = ''; Decls: TLapeDeclarationList = nil): lpString;
-
   interpreter := SimbaSettings.Interpreter._Type.Value;
   if (interpreter <> interp_PS) and (interpreter <> interp_LP) then
     Exit;
@@ -2729,7 +2781,7 @@ begin
   begin
     with TLPThread(Thread) do
     try
-      TraverseGlobals(Compiler, @colbok);
+      ValueDefs.Add(TraverseGlobals(Compiler, @colbok));
       //CoreDefines.AddStrings();
     finally
       Free;
@@ -2746,7 +2798,7 @@ begin
   end;
 
     Stream := TMemoryStream.Create;
-    ValueDefs.SaveToFile('/tmp/out.txt');
+    // ValueDefs.SaveToFile('/tmp/out.txt'); XXX REMOVEME TODO
     ValueDefs.SaveToStream(Stream);
   finally
     ValueDefs.Free;
