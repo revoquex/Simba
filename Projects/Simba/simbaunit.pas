@@ -62,7 +62,8 @@ uses
   updater,
   SM_Main,
   newsimbasettings
-  {$IFDEF USE_DEBUGGER}, debugger{$ENDIF};
+  {$IFDEF USE_DEBUGGER}, debugger{$ENDIF}
+  {$IFDEF USE_LAPE},lptypes, lpvartypes, lpcompiler, lputils{$ENDIF};
 
 const
   interp_PS = 0; //PascalScript
@@ -526,7 +527,7 @@ type
     procedure SaveFormSettings;
     procedure LoadExtensions;
     procedure AddRecentFile(const filename : string);
-    procedure InitializeTMThread(out Thread : TMThread);
+    procedure InitializeTMThread(Interpreter: Integer; out Thread : TMThread);
     procedure HandleParameters;
     procedure HandleConfigParameter;
     procedure OnSaveScript(const Filename : string);
@@ -1364,7 +1365,7 @@ begin
       FormWritelnEx('The script hasn''t stopped yet, so we cannot start a new one.');
       exit;
     end;
-    InitializeTMThread(scriptthread);
+    InitializeTMThread(SimbaSettings.Interpreter._Type.Value, scriptthread);
     ScriptThread.CompileOnly:= false;
     ScriptThread.OnTerminate:=@ScriptThreadTerminate;
     ScriptState:= ss_Running;
@@ -1876,7 +1877,7 @@ end;
 
 { Loads/Creates the required stuff for a script thread. }
 
-procedure TSimbaForm.InitializeTMThread(out Thread: TMThread);
+procedure TSimbaForm.InitializeTMThread(Interpreter: Integer; out Thread: TMThread);
 var
   ScriptPath: string;
   Script: string;
@@ -1903,7 +1904,7 @@ begin
   CurrentSyncInfo.SyncMethod:= @Self.SafeCallThread;
 
   try
-    case SimbaSettings.Interpreter._Type.Value of
+    case Interpreter of
       interp_PS: Thread := TPSThread.Create(True, @CurrentSyncInfo, SimbaSettings.Plugins.Path.Value);
       {$IFDEF USE_LAPE}interp_LP: Thread := TLPThread.Create(True, @CurrentSyncInfo, SimbaSettings.Plugins.Path.Value);{$ENDIF}
       else
@@ -2098,7 +2099,7 @@ procedure TSimbaForm.ActionCompileScriptExecute(Sender: TObject);
 var
   TempThread : TMThread;
 begin
-  InitializeTMThread(TempThread);
+  InitializeTMThread(SimbaSettings.Interpreter._Type.Value, TempThread);
   TempThread.CompileOnly:= true;
   TempThread.Start;
 end;
@@ -2672,14 +2673,27 @@ begin
   {$IFDEF USE_EXTENSIONS}FreeAndNil(ExtManager);{$ENDIF}
 end;
 
+function colbok(v: TLapeGlobalVar; AName: lpString; Compiler: TLapeCompiler): lpString;
+begin
+  result := v.Name + ': ' + v.VarType.AsString + '=' + v.AsString;
+  writeln(Result);
+  //CoreDefines.AddString(Result);
+end;
+
 procedure TSimbaForm.CCFillCore;
 var
-  Thread: TPSThread;
+  Thread: TMThread;
   ValueDefs: TStringList;
   Stream: TMemoryStream;
   Buffer: TCodeInsight;
+  interpreter: integer;
+
 begin
-  if (SimbaSettings.Interpreter._Type.Value <> interp_PS) then
+    // function TraverseGlobals(Compiler: TLapeCompiler; Callback: TTraverseCallback;
+    // BaseName: lpString = ''; Decls: TLapeDeclarationList = nil): lpString;
+
+  interpreter := SimbaSettings.Interpreter._Type.Value;
+  if (interpreter <> interp_PS) and (interpreter <> interp_LP) then
     Exit;
 
   if UpdatingFonts then
@@ -2700,21 +2714,39 @@ begin
 
   ValueDefs := TStringList.Create;
   try
-    InitializeTMThread(TMThread(Thread));
+    InitializeTMThread(SimbaSettings.Interpreter._Type.Value, TMThread(Thread));
     Thread.FreeOnTerminate := False;
 
-    if (not ((Assigned(Thread)) and (Thread is TPSThread))) then
+    if not Assigned(Thread) then
+      Exit;
+    if (not (Thread is TPSThread) and (interpreter = interp_PS)) then
       Exit;
 
-    with Thread do
+    if (not (Thread is TLPThread) and (interpreter = interp_LP)) then
+      Exit;
+
+  if interpreter = interp_LP then
+  begin
+    with TLPThread(Thread) do
+    try
+      TraverseGlobals(Compiler, @colbok);
+      //CoreDefines.AddStrings();
+    finally
+      Free;
+    end;
+  end else
+  begin
+    with TPSThread(Thread) do
     try
       PSScript.GetValueDefs(ValueDefs);
       CoreDefines.AddStrings(PSScript.Defines);
     finally
       Free;
     end;
+  end;
 
     Stream := TMemoryStream.Create;
+    ValueDefs.SaveToFile('/tmp/out.txt');
     ValueDefs.SaveToStream(Stream);
   finally
     ValueDefs.Free;
