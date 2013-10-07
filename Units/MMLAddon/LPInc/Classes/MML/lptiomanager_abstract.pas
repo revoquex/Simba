@@ -306,8 +306,8 @@ begin
   begin
     addClass('TIOManager_Abstract');
 
-    //addGlobalFunc('procedure TIOManager_Abstract.Init(); overload;', @TIOManager_Abstract_Init);
-    //addGlobalFunc('procedure TIOManager_Abstract.Init(plugin_dir: string); overload;', @TIOManager_Abstract_InitEx);
+    addGlobalFunc('procedure TIOManager_Abstract.Init();', @TIOManager_Abstract_Init);
+    addGlobalFunc('procedure TIOManager_Abstract.InitEx(plugin_dir: string);', @TIOManager_Abstract_InitEx);
     addGlobalFunc('function TIOManager_Abstract.GetError(): String;', @TIOManager_Abstract_GetError);
     addGlobalFunc('function TIOManager_Abstract.ReceivedError(): Boolean;', @TIOManager_Abstract_ReceivedError);
     addGlobalFunc('procedure TIOManager_Abstract.ResetError();', @TIOManager_Abstract_ResetError);

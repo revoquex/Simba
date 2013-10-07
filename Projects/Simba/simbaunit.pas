@@ -57,11 +57,13 @@ uses
 
   v_ideCodeInsight, CastaliaPasLexTypes, // Code completion units
   CastaliaSimplePasPar, v_AutoCompleteForm,  // Code completion units
-  PSDump,
+
+  {$IFDEF USE_PASCALSCRIPT}PSDump, {$ENDIF}
 
   updater,
-  SM_Main,
   newsimbasettings
+
+  {$IFDEF USE_SCRIPTMANAGER}, SM_Main{$ENDIF}
   {$IFDEF USE_DEBUGGER}, debugger{$ENDIF};
 
 const
@@ -822,15 +824,16 @@ var
   b: TStringList;
   ms: TMemoryStream;
 begin
+  Result := False;
   ci := nil;
   try
     Index := PluginsGlob.LoadPlugin(LibName);
   except
-    Exit(False);
+    Exit();
   end;
 
   if (Index < 0) then
-    Exit(False);
+    Exit();
 
   b := TStringList.Create;
   try
@@ -851,6 +854,7 @@ begin
       WriteLn(LibName);
       FileName := PluginsGlob.Loaded[Index].Filename;
       Run(ms, nil, -1, True);
+      Result := True;
     except
       mDebugLn('CC ERROR: Could not parse imports for plugin: ' + LibName);
     end;
@@ -984,10 +988,16 @@ begin
 
   Interpreter := TIntegerSetting(obj).Value;
 
-  if (Interpreter < 0) or (Interpreter > 1) then
+  if (not (Interpreter in [{$IFDEF USE_PASCALSCRIPT}interp_PS, {$ENDIF}{$IFDEF USE_LAPE}interp_LP{$ENDIF}])) then
   begin
-    writeln('Resetting interpreter to valid value');
-    SimbaSettings.Interpreter._Type.Value := 1; //Default Lape
+    writeln('Resetting interpreter to default value');
+
+
+    {$IFDEF USE_LAPE}
+    SimbaSettings.Interpreter._Type.Value := interp_LP;
+    {$ELSE}
+    {$IFDEF USE_PASCALSCRIPT}SimbaSettings.Interpreter._Type.Value := interp_PS;{$ENDIF}
+    {$ENDIF}
   end;
 
   UpdateInterpreter;
@@ -1730,22 +1740,28 @@ var
   i,ii : integer;
 begin
   self.BeginFormUpdate;
+
   str := SimbaSettings.LastConfig.MainForm.Position.GetDefValue('');
-  if str <> '' then
+
+  if (str <> '') then
   begin;
-    Data := Explode(':',str);
-    if length(Data) <> 4 then
+    Data := Explode(':', str);
+
+    if (Length(Data) <> 4) then
       Exit;
-    Self.Left:= StrToIntDef(Data[0],Self.Left);
-    Self.Top:= StrToIntDef(Data[1],self.top);
-    Self.Width:= StrToIntDef(Data[2],self.width);
-    Self.Height:= StrToIntDef(Data[3],self.height);
+
+    self.Left := StrToIntDef(Data[0], Self.Left);
+    self.Top := StrToIntDef(Data[1], self.Top);
+    self.Width := StrToIntDef(Data[2], self.Width);
+    self.Height := StrToIntDef(Data[3], self.Height);
   end;
+
+  {$IFNDEF LINUX}
   str := lowercase(SimbaSettings.LastConfig.MainForm.State.GetDefValue('normal'));
-  if str = 'maximized' then
-    self.windowstate := wsMaximized
-  else
-    Self.WindowState := wsNormal;
+  if (str = 'maximized') then
+    self.WindowState := wsMaximized;
+  {$ENDIF}
+
   if SettingExists(ssRecentFilesCount) then
   begin;
     ii := StrToIntDef(LoadSettingDef(ssRecentFilesCount, '-1'), -1);
@@ -1774,6 +1790,8 @@ begin
     Writeln('Hiding tray.'); // TODO REMOVE?
   end;
   UpdateInterpreter;
+
+  PluginsGlob.AddPath(SimbaSettings.Plugins.Path.Value);
   self.EndFormUpdate;
 end;
 
@@ -1931,22 +1949,24 @@ begin
 
   try
     case SimbaSettings.Interpreter._Type.Value of
-      interp_PS: Thread := TPSThread.Create(True, @CurrentSyncInfo, SimbaSettings.Plugins.Path.Value);
+      {$IFDEF USE_PASCALSCRIPT}interp_PS: Thread := TPSThread.Create(True, @CurrentSyncInfo, SimbaSettings.Plugins.Path.Value);{$ENDIF}
       {$IFDEF USE_LAPE}interp_LP: Thread := TLPThread.Create(True, @CurrentSyncInfo, SimbaSettings.Plugins.Path.Value);{$ENDIF}
       else
-        raise Exception.CreateFmt('Unknown Interpreter %d!', [SimbaSettings.Interpreter._Type.Value]);
+        raise Exception.CreateFmt('Invalid Interpreter (%d)', [SimbaSettings.Interpreter._Type.Value]);
     end;
   except
     on E: Exception do
     begin
-      formWritelnEx('Failed to initialise the interpreter: ' + E.Message);
+      formWritelnEx('Initialization Failed: ' + E.Message);
       Thread := nil;
       Exit;
     end;
   end;
-  
+
+  {$IFDEF USE_PASCALSCRIPT}
   if ((Thread is TPSThread) and (CurrScript.ScriptFile <> '')) then
     TPSThread(Thread).PSScript.MainFileName := CurrScript.ScriptFile;
+  {$ENDIF}
 
   {$IFNDEF TERMINALWRITELN}
   Thread.SetDebug(@formWriteln);
@@ -1960,8 +1980,6 @@ begin
 
   ScriptPath := CurrScript.ScriptFile;
 
-  if DirectoryExists(SimbaSettings.Plugins.Path.Value) then
-     PluginsGlob.AddPath(SimbaSettings.Plugins.Path.Value);
   if not DirectoryExists(SimbaSettings.Includes.Path.Value) then
     if FirstRun then
       FormWritelnEx('Warning: The include directory specified in the Settings isn''t valid.');
@@ -2763,24 +2781,31 @@ begin
 
   ValueDefs := TStringList.Create();
   try
-    if (SimbaSettings.Interpreter._Type.Value = interp_PS) then
-    begin
-      with TPSThread(Thread) do
-      try
-        PSScript.GetValueDefs(ValueDefs);
-        CoreDefines.AddStrings(PSScript.Defines);
-      finally
-        Free();
-      end;
-    end else if (SimbaSettings.Interpreter._Type.Value = interp_LP) then
-    begin
-      with TLPThread(Thread) do
-      try
-        GetValueDefs(ValueDefs);
-        CoreDefines.AddStrings(Compiler.BaseDefines);
-      finally
-        Free();
-      end;
+    case SimbaSettings.Interpreter._Type.Value of
+      {$IFDEF USE_PASCALSCRIPT}
+      interp_PS:
+        begin
+          with TPSThread(Thread) do
+          try
+            PSScript.GetValueDefs(ValueDefs);
+            CoreDefines.AddStrings(PSScript.Defines);
+          finally
+            Free();
+          end;
+        end;
+      {$ENDIF}
+      {$IFDEF USE_LAPE}
+      interp_LP:
+        begin
+          with TLPThread(Thread) do
+          try
+            GetValueDefs(ValueDefs);
+            CoreDefines.AddStrings(Compiler.BaseDefines);
+          finally
+            Free();
+          end;
+        end;
+      {$ENDIF}
     end;
 
     Stream := TMemoryStream.Create;
@@ -2879,9 +2904,6 @@ begin
   Self.OnScriptStart := @ScriptStartEvent;
   Self.OnScriptOpen := @ScriptOpenEvent;
 
-  FillThread := TProcThread.Create;
-  FillThread.ClassProc := @CCFillCore;
-
   UpdateTimer.OnTimer := @UpdateTimerCheck;
 
   Application.CreateForm(TSimbaUpdateForm, SimbaUpdateForm);
@@ -2897,6 +2919,9 @@ begin
 
   Application.CreateForm(TSettingsForm,SettingsForm);
   Application.CreateForm(TSettingsSimpleForm,SettingsSimpleForm);
+
+  FillThread := TProcThread.Create;
+  FillThread.ClassProc := @CCFillCore;
 
   if not FileExistsUTF8(SimbaSettingsFile) then
   begin
@@ -2942,12 +2967,16 @@ begin
 
   TT_Update.Visible:= false;
 
+  {$IFDEF USE_SCRIPTMANAGER}TT_ScriptManager.Visible := True;{$ENDIF}
+
   //Load the extensions
   {$IFDEF USE_EXTENSIONS}LoadExtensions;{$ENDIF}
 
   UpdateTitle;
 
+  {$IFDEF USE_PASCALSCRIPT}ActionPascalScript.Visible := True;{$ENDIF}
   {$IFDEF USE_LAPE}ActionLape.Visible := True;{$ENDIF}
+
   {$IFDEF USE_EXTENSIONS}ActionExtensions.Visible := True;{$ENDIF}
 
   // TODO TEST
@@ -3164,10 +3193,10 @@ begin
   if frmFunctionList.FunctionList.Items.Count = 0 then
   begin;
     case SimbaSettings.Interpreter._Type.Value of
-      interp_PS: Methods := TPSThread.GetExportedMethods();
-      interp_LP: Methods := TLPThread.GetExportedMethods();
+      {$IFDEF USE_PASCALSCRIPT}interp_PS: Methods := TPSThread.GetExportedMethods();{$ENDIF}
+      {$IFDEF USE_LAPE}interp_LP: Methods := TLPThread.GetExportedMethods(); {$ENDIF}
       else
-        raise Exception.Create('Invalid Interpreter!');
+        formWritelnEx('You have an invalid Interpreter set.');
     end;
 
     Tree := frmFunctionList.FunctionList;
@@ -3695,8 +3724,10 @@ end;
 
 procedure TSimbaForm.TT_ScriptManagerClick(Sender: TObject);
 begin
+  {$IFDEF USE_SCRIPTMANAGER}
   SManager.SetOptions(AppPath,SimbaSettings.ScriptManager.ServerURL.Value,SimbaSettings.ScriptManager.StoragePath.Value,SimbaSettings.ScriptManager.FileName.Value,SimbaSettings.ScriptManager.FirstRun.Value);
   if not (SManager.Visible = false) then Smanager.Show else SManager.Hide;
+  {$ENDIF}
 end;
 
 procedure TSimbaForm.SetShowParamHintAuto(const AValue: boolean);
@@ -3790,24 +3821,30 @@ var
   LocalCopy : TSyncInfo;
 begin
   LocalCopy := CurrentSyncInfo;
+
   mDebugLn('Executing : ' + LocalCopy.MethodName);
-  thread:= TMThread(LocalCopy.OldThread);
-  mmlpsthread.CurrThread:= thread;
+
+  thread := TMThread(LocalCopy.OldThread);
+  mmlpsthread.CurrThread := thread;
+
   try
+    {$IFDEF USE_PASCALSCRIPT}
     if thread is TPSThread then
     begin
       with TPSThread(thread).PSScript do
       begin
-        OnLine:=@OnLinePSScript;
-        LocalCopy.Res^:= Exec.RunProcPVar(LocalCopy.V^,Exec.GetProc(LocalCopy.MethodName));
-        Online := nil;
+        OnLine := @OnLinePSScript;
+        LocalCopy.Res^ := Exec.RunProcPVar(LocalCopy.V^, Exec.GetProc(LocalCopy.MethodName));
+        OnLine := nil;
+
+        Exit;
       end;
-    end else
-    begin
-      raise Exception.Create('ThreadSafeCall not implemented on this client');
     end;
+    {$ENDIF}
+
+    raise Exception.Create('ThreadSafeCall not implemented on this client');
   finally
-    mmlpsthread.CurrThread:= nil;
+    mmlpsthread.CurrThread := nil;
   end;
 end;
 

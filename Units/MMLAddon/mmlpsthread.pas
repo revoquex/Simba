@@ -32,14 +32,17 @@ unit mmlpsthread;
 interface
 
 uses
-  Classes, SysUtils, client, uPSComponent, uPSCompiler, PSDump,
-  uPSRuntime, uPSPreProcessor, MufasaTypes, MufasaBase, web, fontloader,
+  Classes, SysUtils, client, MufasaTypes, MufasaBase, web, fontloader,
   bitmaps, plugins, dynlibs, internets,scriptproperties,
   settings, settingssandbox, lcltype, dialogs
   {$IFDEF USE_SQLITE}, msqlite3{$ENDIF}
+
   {$IFDEF USE_LAPE}
   , lpparser, lpcompiler, lptypes, lpvartypes,
     lpeval, lpinterpreter, lputils
+  {$ENDIF}
+  {$IFDEF USE_PASCALSCRIPT}
+  , uPSComponent, uPSCompiler, PSDump, uPSRuntime, uPSPreProcessor
   {$ENDIF};
 
 const
@@ -149,10 +152,6 @@ type
       procedure FormCallBackEx(cmd : integer; var data : pointer);
       procedure FormCallBack(cmd : integer; data : pointer);
       procedure HandleError(ErrorRow,ErrorCol,ErrorPosition : integer; ErrorStr : string; ErrorType : TErrorType; ErrorModule : string);
-      function ProcessDirective(Sender: TPSPreProcessor;
-                    Parser: TPSPascalPreProcessorParser;
-                    Active: Boolean;
-                    DirectiveName, DirectiveArgs: string; Filename:String): boolean;
       function LoadFile(ParentFile: string; var FileName, Content: string): boolean;
 
       procedure AddMethod(meth: TExpMethod); virtual;
@@ -179,8 +178,13 @@ type
 
     { TPSThread }
 
+    {$IFDEF USE_PASCALSCRIPT}
     TPSThread = class(TMThread)
       public
+        function ProcessDirective(Sender: TPSPreProcessor;
+                    Parser: TPSPascalPreProcessorParser;
+                    Active: Boolean;
+                    DirectiveName, DirectiveArgs: string; Filename:String): boolean;
         procedure OnProcessDirective(Sender: TPSPreProcessor;
           Parser: TPSPascalPreProcessorParser; const Active: Boolean;
           const DirectiveName, DirectiveParam: string; var Continue: Boolean;
@@ -216,6 +220,7 @@ type
         procedure Execute; override;
         procedure Terminate; override;
     end;
+    {$ENDIF}
 
    {$IFDEF USE_LAPE}
    { TLPThread }
@@ -265,18 +270,21 @@ uses
   SimbaUnit,
   colour_conv, dtmutil,
   {$ifdef mswindows}windows,  MMSystem,{$endif}//MMSystem -> Sounds
-  uPSC_std, uPSC_controls,uPSC_classes,uPSC_graphics,uPSC_stdctrls,uPSC_forms, uPSC_menus,
-  uPSC_extctrls, uPSC_mml, uPSC_dll, //Compile-libs
-  uPSUtils,
   IOmanager,//TTarget_Exported
   IniFiles,//Silly INI files
   stringutil, //String st00f
   newsimbasettings, // SimbaSettings
-  {$IFDEF USE_DEBUGGER}debugger,{$ENDIF}
 
+  {$IFDEF USE_DEBUGGER}debugger, {$ENDIF}
+
+  {$IFDEF USE_PASCALSCRIPT}
+  uPSC_std, uPSC_controls,uPSC_classes,uPSC_graphics,uPSC_stdctrls,uPSC_forms, uPSC_menus,
+  uPSC_extctrls, uPSC_mml, uPSC_dll, //Compile-libs
+  uPSUtils,
   uPSR_std, uPSR_controls,uPSR_classes,uPSR_graphics,uPSR_stdctrls,uPSR_forms, uPSR_mml,
   uPSR_menus, uPSR_dll,
   uPSI_ComCtrls, uPSI_Dialogs,
+  {$ENDIF}
   files,
   dtm, //Dtms!
   uPSR_extctrls, //Runtime-libs
@@ -468,7 +476,171 @@ begin
   end;
 end;
 
-function TMThread.ProcessDirective(Sender: TPSPreProcessor;
+procedure TMThread.SetDebug(writelnProc: TWritelnProc);
+begin
+  DebugTo := writelnProc;
+  Client.WritelnProc:= writelnProc;
+end;
+
+procedure TMThread.SetSettings(S: TMMLSettings; SimbaSetFile: String);
+begin
+  Self.SimbaSettingsFile := SimbaSetFile;
+  Self.Settings := S;
+  Self.Sett := TMMLSettingsSandbox.Create(Self.Settings);
+  Self.Sett.prefix := 'Scripts/';
+end;
+
+procedure TMThread.SetPath(ScriptP: string);
+begin
+  ScriptPath := IncludeTrailingPathDelimiter(ExpandFileName(ExtractFileDir(ScriptP)));
+  ScriptFile := ExtractFileName(ScriptP);
+end;
+
+procedure TMThread.SetFonts(Fonts: TMFonts);
+begin
+  if Assigned(Fonts) then
+    Client.MOCR.Fonts := Fonts;
+end;
+
+procedure TMThread.HandleScriptTerminates;
+var
+  I: integer;
+  V: array of Variant;
+begin
+  SetLength(V, 0);
+  if (SP_OnTerminate in Prop.Properties) then
+    for I := 0 to Prop.OnTerminateProcs.Count - 1 do
+      CallMethod(Prop.OnTerminateProcs[I], V);
+end;
+
+{$IFDEF USE_PASCALSCRIPT}
+function ThreadSafeCall(aProcName: string; var V: TVariantArray): Variant; extdecl;
+begin
+  if GetCurrentThreadId = MainThreadID then
+  begin
+    with TPSThread(currthread).PSScript do
+      Result := Exec.RunProcPVar(V,Exec.GetProc(aProcName));
+  end else
+  begin
+    CurrThread.SyncInfo^.MethodName:= aProcName;
+    CurrThread.SyncInfo^.V:= @V;
+    CurrThread.SyncInfo^.OldThread := CurrThread;
+    CurrThread.SyncInfo^.Res := @Result;
+    CurrThread.Synchronize(CurrThread.SyncInfo^.SyncMethod);
+  end;
+end;
+
+function CallProc(aProcName: string; var V: TVariantArray): Variant; extdecl;
+begin
+  with TPSThread(currthread).PSScript do
+    Result := Exec.RunProcPVar(V,Exec.GetProc(aProcName));
+end;
+{$ENDIF}
+
+{$I PSInc/Wrappers/other.inc}
+{$I PSInc/Wrappers/settings.inc}
+{$I PSInc/Wrappers/bitmap.inc}
+{$I PSInc/Wrappers/window.inc}
+{$I PSInc/Wrappers/tpa.inc}
+{$I PSInc/Wrappers/strings.inc}
+{$I PSInc/Wrappers/crypto.inc}
+{$I PSInc/Wrappers/colour.inc}
+{$I PSInc/Wrappers/colourconv.inc}
+{$I PSInc/Wrappers/math.inc}
+{$IFDEF USE_SQLITE}
+{$I PSInc/Wrappers/ps_sqlite3.inc}
+{$ENDIF}
+{$I PSInc/Wrappers/mouse.inc}
+{$I PSInc/Wrappers/file.inc}
+{$I PSInc/Wrappers/keyboard.inc}
+{$I PSInc/Wrappers/dtm.inc}
+{$I PSInc/Wrappers/ocr.inc}
+{$I PSInc/Wrappers/internets.inc}
+
+{$IFDEF USE_PASCALSCRIPT}
+{$I PSInc/psmethods.inc}
+{***implementation TPSThread***}
+
+constructor TPSThread.Create(CreateSuspended : boolean; TheSyncInfo : PSyncInfo; plugin_dir: string);
+var
+  I, H: LongInt;
+begin
+  inherited Create(CreateSuspended, TheSyncInfo, plugin_dir);
+  PSScript := TPSScriptExtension.Create(nil);
+  PSScript.UsePreProcessor := True;
+  PSScript.UseDebugInfo := True;
+  PSScript.CompilerOptions := PSScript.CompilerOptions + [icBooleanShortCircuit];
+  PSScript.OnNeedFile := @RequireFile;
+  PSScript.OnIncludingFile := @OnIncludingFile;
+  PSScript.OnFileAlreadyIncluded := @FileAlreadyIncluded;
+  PSScript.OnProcessDirective := @OnProcessDirective;
+  PSScript.OnProcessUnknowDirective := @PSScriptProcessUnknownDirective;
+  PSScript.OnCompile := @OnCompile;
+  PSScript.OnCompImport := @OnCompImport;
+  PSScript.OnExecImport := @OnExecImport;
+  PSScript.OnFindUnknownFile := @PSScriptFindUnknownFile;
+
+  {$IFDEF USE_DEBUGGER}
+  DebuggerForm.DebugThread := Self;
+  if (SimbaForm.CurrScript.SynEdit.Marks.Count > 0) then
+    TThread.Synchronize(nil, @DebuggerForm.ShowForm);
+  {$ENDIF}
+
+  with PSScript do
+  begin
+    // Set some defines
+    {$I PSInc/psdefines.inc}
+  end;
+
+  H := High(ExportedMethods);
+  for I := 0 to H do
+    if (Pos('Writeln', ExportedMethods[i].FuncDecl) > 0) then
+    begin
+      ExportedMethods[i].FuncPtr := nil;
+      Break;
+    end;
+end;
+
+
+destructor TPSThread.Destroy;
+begin
+  PSScript.Free;
+  inherited;
+end;
+
+class function TPSThread.GetExportedMethods: TExpMethodArr;
+var
+  c : integer;
+  CurrSection : string;
+
+procedure SetCurrSection(str : string);
+begin;
+  CurrSection := Str;
+end;
+
+procedure AddFunction( Ptr : Pointer; DeclStr : String);
+begin;
+  if c >= 600 then
+    raise exception.create('TMThread.LoadMethods: Exported more than 600 functions');
+
+  Result[c].FuncDecl:= DeclStr;
+  Result[c].FuncPtr:= Ptr;
+  Result[c].Section:= CurrSection;
+
+  Inc(c);
+end;
+
+begin
+  c := 0;
+  CurrSection := 'Other';
+  SetLength(Result, 500);
+
+  {$i PSInc/psexportedmethods.inc}
+
+  SetLength(Result, c);
+end;
+
+function TPSThread.ProcessDirective(Sender: TPSPreProcessor;
         Parser: TPSPascalPreProcessorParser;
         Active: Boolean;
         DirectiveName, DirectiveArgs: string; FileName: string): boolean;
@@ -549,167 +721,6 @@ begin
   end else
     Result := False; // If we do not know the directive; return true so Continue
                     // will be false.
-end;
-
-procedure TMThread.SetDebug(writelnProc: TWritelnProc);
-begin
-  DebugTo := writelnProc;
-  Client.WritelnProc:= writelnProc;
-end;
-
-procedure TMThread.SetSettings(S: TMMLSettings; SimbaSetFile: String);
-begin
-  Self.SimbaSettingsFile := SimbaSetFile;
-  Self.Settings := S;
-  Self.Sett := TMMLSettingsSandbox.Create(Self.Settings);
-  Self.Sett.prefix := 'Scripts/';
-end;
-
-procedure TMThread.SetPath(ScriptP: string);
-begin
-  ScriptPath := IncludeTrailingPathDelimiter(ExpandFileName(ExtractFileDir(ScriptP)));
-  ScriptFile := ExtractFileName(ScriptP);
-end;
-
-procedure TMThread.SetFonts(Fonts: TMFonts);
-begin
-  if Assigned(Fonts) then
-    Client.MOCR.Fonts := Fonts;
-end;
-
-procedure TMThread.HandleScriptTerminates;
-var
-  I: integer;
-  V: array of Variant;
-begin
-  SetLength(V, 0);
-  if (SP_OnTerminate in Prop.Properties) then
-    for I := 0 to Prop.OnTerminateProcs.Count - 1 do
-      CallMethod(Prop.OnTerminateProcs[I], V);
-end;
-
-function ThreadSafeCall(aProcName: string; var V: TVariantArray): Variant; extdecl;
-begin
-  if GetCurrentThreadId = MainThreadID then
-  begin
-    with TPSThread(currthread).PSScript do
-      Result := Exec.RunProcPVar(V,Exec.GetProc(aProcName));
-  end else
-  begin
-    CurrThread.SyncInfo^.MethodName:= aProcName;
-    CurrThread.SyncInfo^.V:= @V;
-    CurrThread.SyncInfo^.OldThread := CurrThread;
-    CurrThread.SyncInfo^.Res := @Result;
-    CurrThread.Synchronize(CurrThread.SyncInfo^.SyncMethod);
-  end;
-end;
-
-function CallProc(aProcName: string; var V: TVariantArray): Variant; extdecl;
-begin
-  with TPSThread(currthread).PSScript do
-    Result := Exec.RunProcPVar(V,Exec.GetProc(aProcName));
-end;
-
-{$I PSInc/Wrappers/other.inc}
-{$I PSInc/Wrappers/settings.inc}
-{$I PSInc/Wrappers/bitmap.inc}
-{$I PSInc/Wrappers/window.inc}
-{$I PSInc/Wrappers/tpa.inc}
-{$I PSInc/Wrappers/strings.inc}
-{$I PSInc/Wrappers/crypto.inc}
-{$I PSInc/Wrappers/colour.inc}
-{$I PSInc/Wrappers/colourconv.inc}
-{$I PSInc/Wrappers/math.inc}
-{$IFDEF USE_SQLITE}
-{$I PSInc/Wrappers/ps_sqlite3.inc}
-{$ENDIF}
-{$I PSInc/Wrappers/mouse.inc}
-{$I PSInc/Wrappers/file.inc}
-{$I PSInc/Wrappers/keyboard.inc}
-{$I PSInc/Wrappers/dtm.inc}
-{$I PSInc/Wrappers/ocr.inc}
-{$I PSInc/Wrappers/internets.inc}
-{$I PSInc/psmethods.inc}
-
-{***implementation TPSThread***}
-
-constructor TPSThread.Create(CreateSuspended : boolean; TheSyncInfo : PSyncInfo; plugin_dir: string);
-var
-  I, H: LongInt;
-begin
-  inherited Create(CreateSuspended, TheSyncInfo, plugin_dir);
-  PSScript := TPSScriptExtension.Create(nil);
-  PSScript.UsePreProcessor := True;
-  PSScript.UseDebugInfo := True;
-  PSScript.CompilerOptions := PSScript.CompilerOptions + [icBooleanShortCircuit];
-  PSScript.OnNeedFile := @RequireFile;
-  PSScript.OnIncludingFile := @OnIncludingFile;
-  PSScript.OnFileAlreadyIncluded := @FileAlreadyIncluded;
-  PSScript.OnProcessDirective := @OnProcessDirective;
-  PSScript.OnProcessUnknowDirective := @PSScriptProcessUnknownDirective;
-  PSScript.OnCompile := @OnCompile;
-  PSScript.OnCompImport := @OnCompImport;
-  PSScript.OnExecImport := @OnExecImport;
-  PSScript.OnFindUnknownFile := @PSScriptFindUnknownFile;
-
-  {$IFDEF USE_DEBUGGER}
-  DebuggerForm.DebugThread := Self;
-  if (SimbaForm.CurrScript.SynEdit.Marks.Count > 0) then
-    TThread.Synchronize(nil, @DebuggerForm.ShowForm);
-  {$ENDIF}
-
-  with PSScript do
-  begin
-    // Set some defines
-    {$I PSInc/psdefines.inc}
-  end;
-
-  H := High(ExportedMethods);
-  for I := 0 to H do
-    if (Pos('Writeln', ExportedMethods[i].FuncDecl) > 0) then
-    begin
-      ExportedMethods[i].FuncPtr := nil;
-      Break;
-    end;
-end;
-
-
-destructor TPSThread.Destroy;
-begin
-  PSScript.Free;
-  inherited;
-end;
-
-class function TPSThread.GetExportedMethods: TExpMethodArr;
-var
-  c : integer;
-  CurrSection : string;
-
-procedure SetCurrSection(str : string);
-begin;
-  CurrSection := Str;
-end;
-
-procedure AddFunction( Ptr : Pointer; DeclStr : String);
-begin;
-  if c >= 600 then
-    raise exception.create('TMThread.LoadMethods: Exported more than 600 functions');
-
-  Result[c].FuncDecl:= DeclStr;
-  Result[c].FuncPtr:= Ptr;
-  Result[c].Section:= CurrSection;
-
-  Inc(c);
-end;
-
-begin
-  c := 0;
-  CurrSection := 'Other';
-  SetLength(Result, 500);
-
-  {$i PSInc/psexportedmethods.inc}
-
-  SetLength(Result, c);
 end;
 
 procedure TPSThread.OnProcessDirective(Sender: TPSPreProcessor;
@@ -1255,6 +1266,7 @@ procedure TPSThread.SetScript(script: string);
 begin
    PSScript.Script.Text := LineEnding + Script; //A LineEnding to conform with the info we add to includes
 end;
+{$ENDIF}
 
 {$IFDEF USE_LAPE}
 { TLPThread }
@@ -1623,7 +1635,7 @@ end;
 {$ENDIF}
 
 initialization
-  PluginsGlob := TMPlugins.Create;
+  PluginsGlob := TMPlugins.Create();
 finalization
   //PluginsGlob.Free;
   //Its a nice idea, but it will segfault... the program is closing anyway.

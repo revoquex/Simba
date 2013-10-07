@@ -265,7 +265,7 @@ type
     public
       Includes: TIncludesSection;
       Fonts: TFontsSection;
-      Extensions: TExtensionsSection;
+      {$IFDEF USE_EXTENSIONS}Extensions: TExtensionsSection;{$ENDIF}
       Scripts: TScriptsSection;
       CodeInsight: TCodeInsightSection;
       Tray: TTraySection;
@@ -281,7 +281,7 @@ type
       CodeCompletion: TCodeCompletionSection;
       Notes: TNotesSetion;
 
-      ScriptManager: TScriptManagerSection;
+      {$IFDEF USE_SCRIPTMANAGER}ScriptManager: TScriptManagerSection;{$ENDIF}
 
       LastConfig: TLastConfig;
 
@@ -844,10 +844,12 @@ procedure GetFunctionListShowOnStart(obj: TObject); begin TBooleanSetting(obj).V
 procedure GetCodeHintsShowAutomatically(obj: TObject); begin TBooleanSetting(obj).Value := True; end;
 procedure GetCodeCompletionShowAutomatically(obj: TObject); begin TBooleanSetting(obj).Value := True; end;
 
+{$IFDEF USE_SCRIPTMANAGER}
 procedure GetScriptManagerURL(obj: TObject); begin TStringSetting(obj).Value := 'http://127.0.0.1/'; end;
 procedure GetScriptManagerPath(obj: TObject); begin TFileSetting(obj).Value := SimbaSettings.Scripts.Path.Value+'ScriptStorage.xml'; end;
 procedure GetScriptManagerFile(obj: TObject); begin TStringSetting(obj).Value := 'ScriptManager.xml'; end;
 procedure GetScriptManagerFirstRun(obj: TObject); begin TBooleanSetting(obj).Value := True; end;
+{$ENDIF}
 
 procedure GetSourceEditorLazColors(obj: TObject); begin TBooleanSetting(obj).Value := True; end;
 
@@ -980,6 +982,7 @@ begin
   Notes.Visible := Notes.AddChild(TBooleanSetting.Create(ssNotesVisible)) as TBooleanSetting;
   Notes.Visible.onDefault := @GetNotesVisible;
 
+  {$IFDEF USE_SCRIPTMANAGER}
   ScriptManager := AddChild(TScriptManagerSection.Create()) as TScriptManagerSection;
   ScriptManager.ServerURL := ScriptManager.AddChild(TStringSetting.Create(ssSMURL)) as TStringSetting;
   ScriptManager.ServerURL.onDefault := @GetScriptManagerURL;
@@ -989,6 +992,7 @@ begin
   ScriptManager.FileName.onDefault := @GetScriptManagerFile;
   ScriptManager.FirstRun := ScriptManager.AddChild(TBooleanSetting.Create(ssFRun)) as TBooleanSetting;
   ScriptManager.FirstRun.onDefault := @GetScriptManagerFirstRun;
+  {$ENDIF}
 
   LastConfig := AddChild(TLastConfig.Create()) as TLastConfig;
   LastConfig.MainForm := LastConfig.AddChild(TMainForm.Create()) as TMainForm;

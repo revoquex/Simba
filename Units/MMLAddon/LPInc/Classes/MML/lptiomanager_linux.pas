@@ -107,17 +107,18 @@ begin
     addClass('TIOManager', 'TIOManager_Abstract');
 
     addGlobalType('UInt32', 'TNativeWindow');
-    addGlobalType('Pointer', 'PDisplay'); //TODO: Export properly
+    addGlobalType('Pointer', 'TDisplay');
+    addGlobalType('^TDisplay', 'PDisplay');
 
-    addGlobalFunc('procedure TIOManager.Init();', @TIOManager_Init);
-    addGlobalFunc('procedure TIOManager.Init(plugin_dir: string); overload;', @TIOManager_InitEx);
-    addGlobalFunc('function TIOManager.SetTarget(target: TNativeWindow): integer;', @TIOManager_SetTarget);
-    addGlobalFunc('procedure TIOManager.SetDesktop; override();', @TIOManager_SetDesktop);
-    addGlobalFunc('function TIOManager.GetProcesses(): TSysProcArr; override;', @TIOManager_GetProcesses);
+    addGlobalFunc('procedure TIOManager.Init(); override;', @TIOManager_Init);
+    addGlobalFunc('procedure TIOManager.InitEx(plugin_dir: string); override;', @TIOManager_InitEx);
+    addGlobalFunc('function TIOManager.SetTarget2(target: TNativeWindow): integer;', @TIOManager_SetTarget);
+    addGlobalFunc('procedure TIOManager.SetDesktop();', @TIOManager_SetDesktop);
+    addGlobalFunc('function TIOManager.GetProcesses(): TSysProcArr;', @TIOManager_GetProcesses);
     addGlobalFunc('procedure TIOManager.SetTargetEx(Proc: TSysProc);', @TIOManager_SetTargetEx);
-    addClassVar('TIOManager', 'display', 'PDisplay', @TIOManager_display_Read, @TIOManager_display_Write);
-    addClassVar('TIOManager', 'screennum', 'integer', @TIOManager_screennum_Read, @TIOManager_screennum_Write);
-    addClassVar('TIOManager', 'desktop', 'TNativeWindow', @TIOManager_desktop_Read, @TIOManager_desktop_Write);
+    addClassVar('TIOManager', 'Display', 'PDisplay', @TIOManager_display_Read, @TIOManager_display_Write);
+    addClassVar('TIOManager', 'ScreenNum', 'integer', @TIOManager_screennum_Read, @TIOManager_screennum_Write);
+    addClassVar('TIOManager', 'DesktopEx', 'TNativeWindow', @TIOManager_desktop_Read, @TIOManager_desktop_Write);
     addGlobalFunc('procedure TIOManager.Free();', @TIOManager_Free);
   end;
 end;

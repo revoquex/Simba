@@ -196,9 +196,11 @@ begin
   if (N <> nil) and (N.HasChildren) then
     SimbaSettings.Includes.Path.Value := N.GetLastChild.Text;
 
+  {$IFDEF USE_EXTENSIONS}
   N := PathsTreeView.Items.FindNodeWithText('Extensions');
   if (N <> nil) and (N.HasChildren) then
-    SimbaSettings.Plugins.Path.Value := N.GetLastChild.Text;
+    SimbaSettings.Extensions.Path.Value := N.GetLastChild.Text;
+  {$ENDIF}
 
   N := PathsTreeView.Items.FindNodeWithText('Plugins');
   if (N <> nil) and (N.HasChildren) then
@@ -278,10 +280,16 @@ begin
   if (N <> nil) and (N.HasChildren) then
     N.GetLastChild.Text:= SimbaSettings.Includes.Path.Value;
 
-
   N := PathsTreeView.Items.FindNodeWithText('Extensions');
   if (N <> nil) and (N.HasChildren) then
+  begin
+{$IFNDEF USE_EXTENSIONS}
+    N.DeleteChildren;
+    N.Delete;
+{$ELSE}
     N.GetLastChild.Text:= SimbaSettings.Extensions.Path.Value;
+{$ENDIF}
+  end;
 
   N := PathsTreeView.Items.FindNodeWithText('Plugins');
   if (N <> nil) and (N.HasChildren) then

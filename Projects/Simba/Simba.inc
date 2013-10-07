@@ -35,21 +35,26 @@
                         // command line flags.
 
 {$DEFINE USE_DEBUGGER}
-{$DEFINE USE_SCRIPTMANAGER} // TODO
+//{$DEFINE USE_SCRIPTMANAGER}
 {$DEFINE USE_FORMDESIGNER}
 
+{$DEFINE USE_PASCALSCRIPT}
 {$DEFINE USE_LAPE}
 
-//{$DEFINE USE_SQLITE} // TO build with SQLite3 support. //Has issues currently
-
 {$DEFINE USE_EXTENSIONS}
-//{$DEFINE USE_CODECOMPLETION} // TODO
 
+//{$DEFINE USE_SQLITE} // TO build with SQLite3 support. //Has issues currently
+//{$DEFINE USE_CODECOMPLETION} // TODO
 //{$DEFINE TERMINALWRITELN} // Only used once. Remove from SimbaUnit?
 
 {$MACRO ON}
 {$define lape_extdecl:=cdecl;}
 
 {$if defined(UNIX) or defined(cpu64)}
-	{$UNDEF USE_EXTENSIONS}
+         {$UNDEF USE_PASCALSCRIPT}
+         {$UNDEF USE_EXTENSIONS}
 {$ifend}
+
+{$IFNDEF USE_PASCALSCRIPT}
+         {$UNDEF USE_DEBUGGER}
+{$ENDIF}

@@ -70,8 +70,8 @@ begin
 
     addGlobalType('UInt32', 'TNativeWindow');
 
-    addGlobalFunc('procedure TIOManager.Init(); overload;', @TIOManager_Init);
-    addGlobalFunc('procedure TIOManager.Init(plugin_dir: string); overload;', @TIOManager_InitEx);
+    addGlobalFunc('procedure TIOManager.Init(); override;', @TIOManager_Init);
+    addGlobalFunc('procedure TIOManager.InitEx(plugin_dir: string); override;', @TIOManager_InitEx);
     addGlobalFunc('function TIOManager.SetTarget2(target: TNativeWindow): integer;', @TIOManager_SetTarget); //inheritence issue...
     addGlobalFunc('procedure TIOManager.SetDesktop();', @TIOManager_SetDesktop);
     addGlobalFunc('function TIOManager.GetProcesses(): TSysProcArr;', @TIOManager_GetProcesses);
