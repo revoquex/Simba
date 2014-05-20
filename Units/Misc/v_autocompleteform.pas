@@ -102,7 +102,7 @@ type
     procedure CalculateBounds;
     procedure UpdateHint;
     procedure Paint; override;
-    procedure Show(StartPoint,BracketPoint : TPoint;Decl : TciProcedureDeclaration; Editor : TSynedit; mp : TCodeInsight); reintroduce;
+    procedure Show(StartPoint,BracketPoint : TPoint;Decl : TciProcedureDeclaration; Editor : TSynedit; mp: TCodeInsight); reintroduce;
   end;
 
 implementation
@@ -986,13 +986,15 @@ begin
   if self.Visible then
     self.hide;
 
-  Fmp := mp;
-  FParameters:= Decl.GetParamDeclarations;
+  Fmp := TCodeInsight.Create();
+  Fmp.Assign(mp);
+  FParameters := Decl.GetParamDeclarations;
   if Length(FParameters) = 0 then //Method has no Parameters
   begin
     FreeAndNil(Fmp);
     Exit;
   end;
+
   FDecl := Decl;
   FSynEdit := Editor;
   FStartPoint:= StartPoint;

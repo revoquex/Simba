@@ -31,7 +31,7 @@ uses
   Classes, SysUtils, FileUtil, LResources, Forms, SynHighlighterPas, SynEdit, SynEditMarkupHighAll,
   mmlpsthread,ComCtrls, SynEditKeyCmds, LCLType,MufasaBase, Graphics, Controls, SynEditStrConst,
   v_ideCodeInsight, v_ideCodeParser,  SynEditHighlighter, SynPluginSyncroEdit, SynGutterBase,
-  SynEditMarks, newsimbasettings;
+  SynEditMarks, newsimbasettings, syncobjs;
 const
    ecCodeCompletion = ecUserFirst;
    ecCodeHints = ecUserFirst + 1;
@@ -85,6 +85,8 @@ type
     ScriptChanged: boolean;//We need this for that little * (edited star).
     ScriptThread: TMThread;//Just one thread for now..
     FScriptState: TScriptState;//Stores the ScriptState, if you want the Run/Pause/Start buttons to change accordingly, acces through Form1
+    CodeInsight: TCodeInsight;
+    CodeInsightSection: TCriticalSection;
     procedure undo;
     procedure redo;
     procedure HandleErrorData;
@@ -93,6 +95,7 @@ type
     procedure MakeActiveScriptFrame;
     procedure ScriptThreadTerminate(Sender: TObject);
     constructor Create(TheOwner: TComponent); override;
+    destructor Destroy();
 
     procedure ReloadScript;
     property ActiveLine: LongInt read FActiveLine write SetActiveLine;
@@ -189,36 +192,31 @@ end;
 procedure TScriptFrame.SynEditClickLink(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  mp: TCodeInsight;
   ms: TMemoryStream;
   d: TDeclaration;
   sp, ep: Integer;
   s : string;
 begin
-  mp := TCodeInsight.Create;
-  mp.FileName := ScriptFile;
-  mp.OnMessage := @SimbaForm.OnCCMessage;
-  mp.OnFindInclude := @SimbaForm.OnCCFindInclude;
-  mp.OnLoadLibrary := @SimbaForm.OnCCLoadLibrary;
-
   ms := TMemoryStream.Create;
   SynEdit.Lines.SaveToStream(ms);
 
+  CodeInsightSection.Acquire;
   try
     SynEdit.GetWordBoundsAtRowCol(SynEdit.CaretXY, sp, ep);
     if (SynEdit.CaretY <= 0) or (SynEdit.CaretY > SynEdit.Lines.Count) then
       s := ''
     else
       s := SynEdit.Lines[SynEdit.CaretY - 1];
-    if ep > length(s) then //We are outside the real text, go back to the last char
-       mp.Run(ms, nil, Synedit.SelStart + (Length(s) - Synedit.CaretX))
-    else
-       mp.Run(ms, nil, Synedit.SelStart + (ep - Synedit.CaretX) - 1);
 
-    d := mp.FindVarBase(mp.GetExpressionAtPos);
+    if ep > length(s) then //We are outside the real text, go back to the last char
+       CodeInsight.Run(ms, nil, Synedit.SelStart + (Length(s) - Synedit.CaretX))
+    else
+       CodeInsight.Run(ms, nil, Synedit.SelStart + (ep - Synedit.CaretX) - 1);
+
+    d := CodeInsight.FindVarBase(CodeInsight.GetExpressionAtPos);
     if (d <> nil) then
     begin
-      if (TCodeInsight(d.Parser).FileName <> mp.FileName) then
+      if (TCodeInsight(d.Parser).FileName <> CodeInsight.FileName) then
       begin
         if FileExists(TCodeInsight(d.Parser).FileName) then
         begin;
@@ -239,7 +237,7 @@ begin
 
   finally
     FreeAndNil(ms);
-    FreeAndNil(mp);
+    CodeInsightSection.Release;
   end;
 end;
 
@@ -351,7 +349,6 @@ procedure TScriptFrame.SynEditProcessUserCommand(Sender: TObject;
   Caret : TPoint;
   i,endI : integer;}
 var
-  mp: TCodeInsight;
   ms: TMemoryStream;
   ItemList, InsertList: TStringList;
   sp, ep,bcc,cc,bck,posi,bracketpos: Integer;
@@ -364,18 +361,13 @@ begin
   if (Command = ecCodeCompletion) and ((not SynEdit.GetHighlighterAttriAtRowCol(Point(SynEdit.CaretX - 1, SynEdit.CaretY), s, Attri)) or
                                       ((Attri.Name <> SYNS_AttrComment) and (Attri.name <> SYNS_AttrString) and (Attri.name <> SYNS_AttrDirective))) then
   begin
-    mp := TCodeInsight.Create;
-    mp.FileName := ScriptFile;
-    mp.OnMessage := @SimbaForm.OnCCMessage;
-    mp.OnFindInclude := @SimbaForm.OnCCFindInclude;
-    mp.OnLoadLibrary := @SimbaForm.OnCCLoadLibrary;
-
     ms := TMemoryStream.Create;
     ItemList := TStringList.Create;
     InsertList := TStringList.Create;
     InsertList.Sorted := True;
 
     Synedit.Lines.SaveToStream(ms);
+    CodeInsightSection.Acquire;
     try
       Filter := WordAtCaret(Synedit, sp, ep);
       SimbaForm.CodeCompletionStart := Point(sp, Synedit.CaretY);
@@ -384,12 +376,13 @@ begin
         s := ''
       else
         s := SynEdit.Lines[SynEdit.CaretY - 1];
-      if ep > length(s) then //We are outside the real text, go back to the last char
-         mp.Run(ms, nil, Synedit.SelStart + (Length(s) - Synedit.CaretX) + 1)
-      else
-         mp.Run(ms, nil, Synedit.SelStart + (ep - Synedit.CaretX));
 
-      s := mp.GetExpressionAtPos;
+      if ep > length(s) then //We are outside the real text, go back to the last char
+         CodeInsight.Run(ms, nil, Synedit.SelStart + (Length(s) - Synedit.CaretX) + 1)
+      else
+         CodeInsight.Run(ms, nil, Synedit.SelStart + (ep - Synedit.CaretX));
+
+      s := CodeInsight.GetExpressionAtPos;
       if (s <> '') then
       begin
         ep := LastDelimiter('.', s);
@@ -400,18 +393,19 @@ begin
       end;
 
       if (Data <> nil) then //If showing automatically
-        if (s <> '') and ((mp.DeclarationAtPos <> nil) and ((mp.DeclarationAtPos is TciCompoundStatement) or mp.DeclarationAtPos.HasOwnerClass(TciCompoundStatement, d, True))) then
+        if (s <> '') and ((CodeInsight.DeclarationAtPos <> nil) and ((CodeInsight.DeclarationAtPos is TciCompoundStatement) or CodeInsight.DeclarationAtPos.HasOwnerClass(TciCompoundStatement, d, True))) then
           Data := nil;
+
       if (Data = nil) then
       begin
-        mp.FillSynCompletionProposal(ItemList, InsertList, s);
+        CodeInsight.FillSynCompletionProposal(ItemList, InsertList, s);
         p := SynEdit.ClientToScreen(SynEdit.RowColumnToPixels(Point(sp, SynEdit.CaretY)));
         p.y := p.y + SynEdit.LineHeight;
         SimbaForm.CodeCompletionForm.Show(p, ItemList, InsertList, Filter, SynEdit);
       end;
     finally
       FreeAndNil(ms);
-      FreeAndNil(mp);
+      CodeInsightSection.Release;
       ItemList.Free;
       InsertList.Free;
     end;
@@ -422,28 +416,29 @@ begin
   begin
     if SimbaForm.ParamHint.Visible = true then
       SimbaForm.ParamHint.hide;
-    mp := TCodeInsight.Create;
-    mp.OnMessage := @SimbaForm.OnCCMessage;
-    mp.OnFindInclude := @SimbaForm.OnCCFindInclude;
-    mp.OnLoadLibrary := @SimbaForm.OnCCLoadLibrary;
 
     ms := TMemoryStream.Create;
     synedit.Lines.SaveToStream(ms);
+
+    CodeInsightSection.Acquire;
+    try
     try
       Synedit.GetWordBoundsAtRowCol(Synedit.CaretXY, sp, ep);
       if (SynEdit.CaretY <= 0) or (SynEdit.CaretY > SynEdit.Lines.Count) then
         s := ''
       else
         s := SynEdit.Lines[SynEdit.CaretY - 1];
+
       if ep > length(s) then //We are outside the real text, go back to the last char
-        mp.Run(ms, nil, Synedit.SelStart + (Length(s) - Synedit.CaretX), True)
+        CodeInsight.Run(ms, nil, Synedit.SelStart + (Length(s) - Synedit.CaretX), True)
       else
-        mp.Run(ms, nil, Synedit.SelStart + (ep - Synedit.CaretX) - 1, True);
+        CodeInsight.Run(ms, nil, Synedit.SelStart + (ep - Synedit.CaretX) - 1, True);
 
       bcc := 1;bck := 0;cc := 0;
-      s := mp.GetExpressionAtPos(bcc, bck, cc, ep, posi, bracketpos, true);
+      s := CodeInsight.GetExpressionAtPos(bcc, bck, cc, ep, posi, bracketpos, true);
       if (posi = -1) then
         posi := SynEdit.SelStart + (SynEdit.CaretX - sp);
+
       if (bracketpos = -1) then
         bracketpos := posi + length(s);
 
@@ -451,7 +446,7 @@ begin
       if cc > 0 then
         delete(s, cc, length(s) - cc + 1);
 
-      d := mp.FindVarBase(s);
+      d := CodeInsight.FindVarBase(s);
       dd := nil;
 
       //Find the declaration -> For example if one uses var x : TNotifyEvent..
@@ -460,28 +455,35 @@ begin
       begin
         dd := d;
         d := d.Owner.Items.GetFirstItemOfClass(TciTypeKind);
+
         if (d <> nil) then
         begin
           d := TciTypeKind(d).GetRealType;
           if (d <> nil) and (d is TciReturnType) then
             d := d.Owner;
         end;
+
         if (d <> nil) and (d.Owner <> nil) and (not ((d is TciProcedureDeclaration) or (d.Owner is TciProcedureDeclaration))) then
-          d := mp.FindVarBase(d.CleanText)
+          d := CodeInsight.FindVarBase(d.CleanText)
         else
           Break;
       end;
+
       //Yeah, we should have found the procedureDeclaration now!
       if (d <> nil) and (d <> dd) and (d.Owner <> nil) and ((d is TciProcedureDeclaration) or (d.Owner is TciProcedureDeclaration)) then
       begin
         if (not (d is TciProcedureDeclaration)) and (d.Owner is TciProcedureDeclaration) then
           d := d.Owner;
+
         if (TciProcedureDeclaration(d).Params <> '') then
           SimbaForm.ParamHint.Show(PosToCaretXY(synedit,posi), PosToCaretXY(synedit,bracketpos),
-                                   TciProcedureDeclaration(d), synedit,mp)
+                                   TciProcedureDeclaration(d), synedit, CodeInsight)
         else
           mDebugLn('<no parameters expected>');
       end;
+    finally
+      CodeInsightSection.Release;
+    end;
     except
       on e : exception do
         mDebugLn(e.message);
@@ -730,6 +732,35 @@ begin
   end;
   AddKey(SynEdit,ecCodeCompletion,VK_SPACE,[ssCtrl]);
   AddKey(SynEdit,ecCodeHints,VK_SPACE,[ssCtrl,ssShift]);
+
+  CodeInsightSection := TCriticalSection.Create;
+  CodeInsightSection.Acquire;
+  try
+    CodeInsight := TCodeInsight.Create();
+    with CodeInsight do
+    begin
+      FileName := ScriptFile;
+      OnMessage := @SimbaForm.OnCCMessage;
+      OnFindInclude := @SimbaForm.OnCCFindInclude;
+      OnLoadLibrary := @SimbaForm.OnCCLoadLibrary;
+    end;
+  finally
+    CodeInsightSection.Release;
+  end;
+end;
+
+destructor TScriptFrame.Destroy();
+begin
+  CodeInsightSection.Acquire;
+  try
+    FreeAndNil(CodeInsight);
+  finally
+    CodeInsightSection.Release;
+  end;
+
+  FreeAndNil(CodeInsightSection);
+
+  inherited;
 end;
 
 function TScriptFrame.GetReadOnly: Boolean;

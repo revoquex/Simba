@@ -491,7 +491,10 @@ var
 begin
   for i := 0 to fItems.Count - 1 do
     if (Assigned(fItems[i])) then
+    begin
       TDeclaration(fItems[i]).Free;
+      fItems[i] := nil;
+    end;
   fItems.Clear;
 end;
 
