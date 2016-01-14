@@ -18,15 +18,6 @@ begin
   P2DExtendedArray(Result)^ := ps_GaussMatrix(Pinteger(Params^[0])^, Pextended(Params^[1])^);
 end;
 
-procedure Lape_Max(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pinteger(Result)^ := ps_Max(Pinteger(Params^[0])^, Pinteger(Params^[1])^);
-end;
-
-procedure Lape_Min(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  PInteger(Result)^ := ps_Min(PInteger(Params^[0])^, PInteger(Params^[1])^);
-end;
 
 procedure Lape_MinE(const Params: PParamArray; const Result: Pointer); lape_extdecl
 begin
@@ -48,11 +39,6 @@ begin
   Pinteger(Result)^ := ps_Distance(Pinteger(Params^[0])^, Pinteger(Params^[1])^, Pinteger(Params^[2])^, Pinteger(Params^[3])^);
 end;
 
-procedure Lape_Hypot(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  PExtended(Result)^ := ps_Hypot(PExtended(Params^[0])^, PExtended(Params^[1])^);
-end;
-
 procedure Lape_RandomRange(const Params: PParamArray; const Result: Pointer); lape_extdecl
 begin
   PInteger(Result)^ := ps_RandomRange(PInteger(Params^[0])^, PInteger(Params^[1])^);
@@ -61,11 +47,6 @@ end;
 procedure Lape_RandomE(const Params: PParamArray; const Result: Pointer); lape_extdecl
 begin
   Pextended(Result)^ := ps_RandomE();
-end;
-
-procedure Lape_ArcTan2(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_ArcTan2(Pextended(Params^[0])^, Pextended(Params^[1])^);
 end;
 
 procedure Lape_IncEx(const Params: PParamArray); lape_extdecl
@@ -138,11 +119,6 @@ begin
   PLongWord(Result)^ := ps_rol(Plongword(Params^[0])^, Pbyte(Params^[1])^);
 end;
 
-procedure Lape_tan(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_tan(Pextended(Params^[0])^);
-end;
-
 procedure Lape_radians(const Params: PParamArray; const Result: Pointer); lape_extdecl
 begin
   Pextended(Result)^ := ps_radians(Pextended(Params^[0])^);
@@ -151,86 +127,6 @@ end;
 procedure Lape_degrees(const Params: PParamArray; const Result: Pointer); lape_extdecl
 begin
   Pextended(Result)^ := ps_degrees(Pextended(Params^[0])^);
-end;
-
-procedure Lape_ArcSin(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_ArcSin(Pextended(Params^[0])^);
-end;
-
-procedure Lape_ArcCos(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_ArcCos(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Cotan(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Cotan(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Secant(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Secant(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Cosecant(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Cosecant(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Cot(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Cot(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Sec(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Sec(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Csc(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Csc(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Cosh(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Cosh(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Sinh(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Sinh(Pextended(Params^[0])^);
-end;
-
-procedure Lape_Tanh(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_Tanh(Pextended(Params^[0])^);
-end;
-
-procedure Lape_CotH(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_CotH(Pextended(Params^[0])^);
-end;
-
-procedure Lape_SecH(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_SecH(Pextended(Params^[0])^);
-end;
-
-procedure Lape_CscH(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_CscH(Pextended(Params^[0])^);
-end;
-
-procedure Lape_ArcCosh(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_ArcCosh(Pextended(Params^[0])^);
-end;
-
-procedure Lape_ArcSinh(const Params: PParamArray; const Result: Pointer); lape_extdecl
-begin
-  Pextended(Result)^ := ps_ArcSinh(Pextended(Params^[0])^);
 end;
 
 procedure Lape_DecRet(const Params: PParamArray; const Result: Pointer); lape_extdecl
